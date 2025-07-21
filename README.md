@@ -32,6 +32,8 @@ Statistics:
 
 ### Model Serving
 
+#### Manually through the UI
+
 The following is an example on how to copy and serve models using OpenShift AI. Adapt to the models you want to use.
 
 - In OpenShift, create your projet, in this example `llm-hosting`.
@@ -57,6 +59,10 @@ The following is an example on how to copy and serve models using OpenShift AI. 
   - [MisMistral-7B-Instruct-v0.3](./deployment/model_serving/mistral-vllm-raw.yaml)
   - [Nomic-embed-text-v1.5](./deployment/model_serving/nomic-embed-raw.yaml)
 
+#### Automatically with GitOps
+
+We have shared a repository with the different configurations we use to manage our own OpenShift AI cluster through GitOps. In [this folder](https://github.com/rh-aiservices-bu/rhoaibu-cluster/tree/dev/components/configs/maas/model-serving/base) of the repository you will find the YAML files used to create the different InferenceService instances we use to serve models.
+
 ### Red Hat SSO
 
 In this example we are using Red Hat SSO as the authentication backend for the 3scale Developer Portal. Other backends are supported if you prefer (Github and Auth0).
@@ -64,7 +70,7 @@ In this example we are using Red Hat SSO as the authentication backend for the 3
 - Create the project `rh-sso`.
 - Deploy the Red Hat Single Sign-On operator in the `rh-sso` namespace.
 - Create a Keycloak instance using [keycloak.yaml](./deployment/rh-sso/keycloak.yaml).
-- Create a `rhoai` KeycloakRealm using [keycloakrealm-maas.yaml](./deployment/rh-sso/keycloakrealm-maas.yaml).
+- Create a `rhoai` Keycloak Realm using [keycloakrealm-maas.yaml](./deployment/rh-sso/keycloakrealm-maas.yaml).
 - Open the Red Hat Single Sign-on console (route in the Routes section, access credentials in Secrets->`credentials-rh-sso`).
 - Switch to the Rhoai realm:
   
@@ -209,14 +215,23 @@ This implementation of Models as a Service requires some customization of the De
 To automate the process, we are using the unofficial 3scale CMS CLI to apply the configuration that has been exported in [deployment/3scale/portal](deployment/3scale/portal).
 
 As the access to the 3scale Admin REST APIs is protected, we need to get an access-token as well as the host first
+
 ```bash
 export ACCESS_TOKEN=`oc get secret system-seed -o json -n 3scale | jq -r '.data.ADMIN_ACCESS_TOKEN' | base64 -d`
 export ADMIN_HOST=`oc get route -n 3scale | grep maas-admin | awk '{print $2}'`
 ```
+
 For convenience we set an alias first and then launch the 3scale CMS tool
+
 ```bash
 alias cms='podman run --userns=keep-id:uid=185 -it --rm -v ./deployment/3scale/portal:/cms:Z ghcr.io/fwmotion/3scale-cms:latest'
 cms -k --access-token=${ACCESS_TOKEN} ${ACCESS_TOKEN} https://${ADMIN_HOST}/ upload -u
 ```
 
 There is also a download option in case you want to do changes manually on the 3scale CMS.
+
+#### Automatic configuration using the operator
+
+In [this folder](https://github.com/rh-aiservices-bu/rhoaibu-cluster/tree/dev/components/configs/maas/3scale-config/base) of our cluster configuration repository, you will find the different configuration files (subfolders organized by models) you can use with the 3Scale operator to automatically create and configure Backends and Products.
+
+Adjustments may have to be done after this automated configuration as not all parameters are handled by the operator, like the Default plan that is applied to a Product.
