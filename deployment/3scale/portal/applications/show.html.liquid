@@ -90,30 +90,28 @@
               {% case application.service.system_name %}
                 {% when 'granite-8b-code-instruct' %}
                   granite-8b-code-instruct-128k
-                {% when 'mistral-7b-Instruct-v0-3' %}
-                  mistral-7b-instruct
                 {% when 'nomic-embed-text-v1-5' %}
                   /mnt/models
-                {% when 'granite-3-8b-instruct' %}
-                  granite-3-8b-instruct
                 {% when 'granite-8b-lab-v1' %}
                   granite-8b-lab-v1
-                {% when 'granite-embedding-278m-multilingual' %}
-                  granite-embedding-278m-multilingual
-                {% when 'deepseek-r1-distill-qwen-14b' %}
-                  deepseek-r1-distill-qwen-14b
                 {% when 'deepseek-r1-qwen-14b-w4a16' %}
                   r1-qwen-14b-w4a16
-                {% when 'granite-3-1-8b-instruct-w4a16' %}
-                  granite-3-1-8b-instruct-w4a16
                 {% when 'granite3-guardian-2b' %}
                   granite3-guardian-2b
-                {% when 'llama-3-1-8b-instruct' %}
-                  meta-llama/Llama-3.1-8B-Instruct
-                {% when 'mixtral-8x7b-instruct-v0-1' %}
-                  mistralai/Mixtral-8x7B-Instruct-v0.1
                 {% when 'phi-4' %}
                   microsoft/phi-4
+                {% when 'qwen25-vl-7b-instruct' %}
+                  RedHatAI/Qwen2.5-VL-7B-Instruct-FP8-Dynamic
+                {% when 'granite-vision-3-2-2b' %}
+                  granite-vision-3-2
+                {% when 'mistral-small-24b-w8a8' %}
+                  mistral-small-24b-w8a8
+                {% when 'llama-4-scout-17b-16e-w4a16' %}
+                  llama-4-scout-17b-16e-w4a16
+                {% when 'llama-3-2-3b' %}
+                  llama-3-2-3b
+                {% when 'granite-3-3-8b-instruct' %}
+                  granite-3-3-8b-instruct
                 {% when 'safety-checker' %}
                   Not needed
                 {% when 'docling' %}

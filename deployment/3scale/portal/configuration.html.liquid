@@ -34,81 +34,109 @@ table, th, td {
   <tr>
     <th>Model name</th>
     <th>Model size</th>
+    <th>Quantization</th>
     <th>Max tokens</th>
     <th>GPU type</th>
     <th>VRAM consumed</th>
     <th>Function calling?</th>
   </tr>
   <tr>
-    <td>Granite-3.1-8B-Instruct</td>
-    <td>8B</td>
-    <td>22k</td>
-    <td>A10G</td>
-    <td>22 GB</td>
-    <td>Yes</td>
-  </tr>
-  <tr>
-    <td>Granite-3.1-8B-Instruct-W4A16</td>
-    <td>8B (Compressed)</td>
-    <td>40k</td>
-    <td>A10G</td>
-    <td>20 GB</td>
-    <td>Yes</td>
-  </tr>
-  <tr>
-    <td>Mistral-7B-Instruct-v0.3</td>
-    <td>7B</td>
-    <td>6144</td>
-    <td>A10G</td>
-    <td>22 GB</td>
-    <td>Yes</td>
-  </tr>
-  <tr>
-    <td>DeepSeek-R1-Distill-Qwen-14B</td>
-    <td>14B</td>
-    <td>50k</td>
-    <td>L40</td>
-    <td>41 GB</td>
-    <td>Yes</td>
-  </tr>
-  <tr>
     <td>DeepSeek-R1-Distill-Qwen-14B-W4A16</td>
-    <td>14B (Compressed)</td>
-    <td>40k</td>
-    <td>A10G</td>
-    <td>20 GB</td>
-    <td>Yes</td>
-  </tr>
-  <tr>
-    <td>Llama-3.1-8B-Instruct</td>
-    <td>8B</td>
-    <td>6144</td>
-    <td>A10G</td>
-    <td>20 GB</td>
-    <td>Yes</td>
-  </tr>
-  <tr>
-    <td>Microsoft Phi-4</td>
     <td>14B</td>
-    <td>128k</td>
-    <td>L40</td>
-    <td>39 GB</td>
+    <td>W4A16</td>
+    <td>40k</td>
+    <td>L40S</td>
+    <td>42 GB</td>
+    <td>Yes</td>
+  </tr>
+  <tr>
+    <td>Granite-3.3-8B-Instruct</td>
+    <td>8B</td>
     <td>No</td>
+    <td>26k</td>
+    <td>A10G</td>
+    <td>21 GB</td>
+    <td>Yes</td>
+  </tr>
+  <tr>
+    <td>Granite-8B-Lab</td>
+    <td>8B</td>
+    <td>No</td>
+    <td>6144</td>
+    <td>L40</td>
+    <td>22 GB</td>
+    <td>No</td>
+  </tr>
+  <tr>
+    <td>Granite-3-Guardian-2B</td>
+    <td>2B</td>
+    <td>No</td>
+    <td>6048</td>
+    <td>T4</td>
+    <td>13 GB</td>
+    <td>No</td>
+  </tr>
+  <tr>
+    <td>Granite-Vision-3.2-2B</td>
+    <td>2B</td>
+    <td>No</td>
+    <td>16384</td>
+    <td>L40</td>
+    <td>21 GB</td>
+    <td>Yes</td>
+  </tr>
+  <tr>
+    <td>Llama-3.2-3B-Instruct</td>
+    <td>3B</td>
+    <td>No</td>
+    <td>120k</td>
+    <td>L40</td>
+    <td>21 GB</td>
+    <td>Yes</td>
+  </tr>
+  <tr>
+    <td>Llama-4-Scout-17B-16E-Instruct</td>
+    <td>109B</td>
+    <td>W4A16</td>
+    <td>400k</td>
+    <td>4xL40S</td>
+    <td>4x43 GB</td>
+    <td>Yes</td>
+  </tr>
+  <tr>
+    <td>Mistral-Small-3.1-24B-Instruct</td>
+    <td>24B</td>
+    <td>W8A8</td>
+    <td>90k</td>
+    <td>L40S</td>
+    <td>42 GB</td>
+    <td>Yes</td>
   </tr>
   <tr>
     <td>Nomic-embed-text-v1.5 (4 workers in parallel)</td>
     <td>137M</td>
+    <td>No</td>
     <td>8192</td>
     <td>T4</td>
     <td>15 GB</td>
     <td>N/A</td>
   </tr>
   <tr>
-    <td>Granite-Embedding-278m-multilingual</td>
-    <td>278M</td>
-    <td>514</td>
-    <td>T4</td>
-    <td>1 GB</td>
-    <td>N/A</td>
+    <td>Microsoft Phi-4</td>
+    <td>14B</td>
+    <td>No</td>
+    <td>16384</td>
+    <td>L40S</td>
+    <td>42 GB</td>
+    <td>No</td>
+  </tr>
+  <tr>
+    <td>Qwen2.5-VL-7B-Instruct</td>
+    <td>7B</td>
+    <td>FP8-Dynamic</td>
+    <td>100k</td>
+    <td>A10G</td>
+    <td>19 GB</td>
+    <td>No</td>
   </tr>
 </table>
