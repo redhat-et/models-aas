@@ -1,0 +1,120 @@
+# HTTPRoute for Granite model
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: granite-route
+  namespace: llm
+  labels:
+    kuadrant.io/gateway: kuadrant-gateway
+spec:
+  parentRefs:
+    - name: kuadrant-gateway
+      namespace: llm
+  hostnames:
+    - "localhost"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /granite
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /v1
+      backendRefs:
+        - name: granite-8b-code-instruct-128k-predictor
+          port: 80
+          weight: 100
+---
+# HTTPRoute for Mistral model
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: mistral-route
+  namespace: llm
+  labels:
+    kuadrant.io/gateway: kuadrant-gateway
+spec:
+  parentRefs:
+    - name: kuadrant-gateway
+      namespace: llm
+  hostnames:
+    - "localhost"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /mistral
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /v1
+      backendRefs:
+        - name: mistral-7b-instruct-predictor
+          port: 80
+          weight: 100
+---
+# HTTPRoute for Qwen3-0.6B model
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: qwen-route
+  namespace: llm
+  labels:
+    kuadrant.io/gateway: kuadrant-gateway
+spec:
+  parentRefs:
+    - name: kuadrant-gateway
+      namespace: llm
+  hostnames:
+    - "localhost"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /qwen
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /v1
+      backendRefs:
+        - name: qwen3-0-6b-instruct-predictor
+          port: 80
+          weight: 100
+---
+# HTTPRoute for Nomic embedding model
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: nomic-route
+  namespace: llm
+  labels:
+    kuadrant.io/gateway: kuadrant-gateway
+spec:
+  parentRefs:
+    - name: kuadrant-gateway
+      namespace: llm
+  hostnames:
+    - "localhost"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /nomic
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+      backendRefs:
+        - name: nomic-embed-text-v1-5-predictor
+          port: 80
+          weight: 100

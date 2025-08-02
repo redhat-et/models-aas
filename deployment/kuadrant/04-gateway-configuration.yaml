@@ -1,0 +1,15 @@
+# Istio Gateway for external traffic
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: kuadrant-gateway
+  namespace: llm
+spec:
+  gatewayClassName: istio
+  listeners:
+    - name: http
+      hostname: "localhost"
+      port: 80
+      protocol: HTTP
+# TLS certificate not needed for localhost HTTP access

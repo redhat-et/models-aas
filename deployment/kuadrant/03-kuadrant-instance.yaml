@@ -1,0 +1,80 @@
+# Kuadrant instance configuration
+---
+apiVersion: kuadrant.io/v1beta1
+kind: Kuadrant
+metadata:
+  name: kuadrant
+  namespace: kuadrant-system
+spec:
+  limitador:
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: limitador
+              topologyKey: kubernetes.io/hostname
+    replicas: 2
+    storage:
+      redis:
+        configSecretRef:
+          name: redis-config
+  authorino:
+    replicas: 1
+    metrics:
+      enabled: true
+    tracing:
+      enabled: true
+---
+# Redis configuration for Limitador
+apiVersion: v1
+kind: Secret
+metadata:
+  name: redis-config
+  namespace: kuadrant-system
+type: Opaque
+stringData:
+  URL: "redis://redis:6379"
+---
+# Redis deployment for rate limiting
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: kuadrant-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: kuadrant-system
+spec:
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+      targetPort: 6379

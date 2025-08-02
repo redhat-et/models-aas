@@ -1,0 +1,105 @@
+# Observability configuration for model metrics
+---
+# ServiceMonitor for Prometheus scraping
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kuadrant-models-metrics
+  namespace: llm-observability
+  labels:
+    app: kuadrant-models
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kserve-container
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+---
+# EnvoyFilter to add custom metrics for LLM token counting
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: llm-metrics-filter
+  namespace: llm-observability
+spec:
+  configPatches:
+    - applyTo: HTTP_FILTER
+      match:
+        context: SIDECAR_INBOUND
+        listener:
+          filterChain:
+            filter:
+              name: "envoy.filters.network.http_connection_manager"
+      patch:
+        operation: INSERT_BEFORE
+        value:
+          name: envoy.filters.http.wasm
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm
+            config:
+              name: "llm_token_counter"
+              vm_config:
+                vm_id: "llm_token_counter"
+                runtime: "envoy.wasm.runtime.v8"
+                code:
+                  local:
+                    inline_string: |
+                      class LLMTokenCounter {
+                        constructor(rootContext) {
+                          this.rootContext = rootContext;
+                        }
+                        
+                        onRequestHeaders() {
+                          return FilterHeadersStatus.Continue;
+                        }
+                        
+                        onResponseHeaders() {
+                          return FilterHeadersStatus.Continue;
+                        }
+                        
+                        onResponseBody(bodySize, endOfStream) {
+                          if (endOfStream) {
+                            try {
+                              const body = this.getResponseBody(0, bodySize);
+                              const response = JSON.parse(body);
+                              
+                              if (response.usage) {
+                                const promptTokens = response.usage.prompt_tokens || 0;
+                                const completionTokens = response.usage.completion_tokens || 0;
+                                const totalTokens = response.usage.total_tokens || 0;
+                                
+                                // Record metrics
+                                this.rootContext.recordMetric('llm_prompt_tokens', promptTokens);
+                                this.rootContext.recordMetric('llm_completion_tokens', completionTokens);
+                                this.rootContext.recordMetric('llm_total_tokens', totalTokens);
+                              }
+                            } catch (e) {
+                              // Ignore parsing errors
+                            }
+                          }
+                          return FilterDataStatus.Continue;
+                        }
+                      }
+                      
+                      registerRootContext((rootContextId) => new LLMTokenCounter(rootContextId));
+---
+# Telemetry configuration for Istio metrics
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: llm-telemetry
+  namespace: llm-observability
+spec:
+  metrics:
+    - providers:
+        - name: prometheus
+    - overrides:
+        - match:
+            metric: ALL_METRICS
+          tags:
+            model_name:
+              value: "%{REQUEST_HEADERS['x-model-name'] | 'unknown'}"
+            user_id:
+              value: "%{REQUEST_HEADERS['x-user-id'] | 'anonymous'}"

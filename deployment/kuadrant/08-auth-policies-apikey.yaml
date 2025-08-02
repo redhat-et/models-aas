@@ -1,0 +1,194 @@
+# Authentication policies using API keys instead of Keycloak
+# Provides simple, secure authentication without external dependencies
+---
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: granite-auth-policy
+  namespace: llm
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: granite-route
+  rules:
+    authentication:
+      api-key-users:
+        apiKey:
+          allNamespaces: true
+          selector:
+            matchLabels:
+              app: models-api
+        credentials:
+          authorizationHeader:
+            prefix: APIKEY
+    response:
+      success:
+        filters:
+          identity:
+            json:
+              properties:
+                userid:
+                  selector: auth.identity.metadata.annotations.secret\.kuadrant\.io/user-id
+                groups:
+                  selector: auth.identity.metadata.annotations.kuadrant\.io/groups
+#        headers:
+#          x-user-id:
+#            selector: auth.identity.userid
+#          x-user-groups:
+#            selector: auth.identity.groups
+#          x-auth-method:
+#            value: api-key
+    authorization:
+      allow-groups:
+        opa:
+          rego: |
+            groups := split(object.get(input.auth.identity.metadata.annotations, "kuadrant.io/groups", ""), ",")
+            allow { groups[_] == "admin" }
+            allow { groups[_] == "developer" }
+            allow { groups[_] == "user" }
+            allow { groups[_] == "readonly" }
+---
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: mistral-auth-policy
+  namespace: llm
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: mistral-route
+  rules:
+    authentication:
+      api-key-users:
+        apiKey:
+          allNamespaces: true
+          selector:
+            matchLabels:
+              app: models-api
+        credentials:
+          authorizationHeader:
+            prefix: APIKEY
+    response:
+      success:
+        filters:
+          identity:
+            json:
+              properties:
+                userid:
+                  selector: auth.identity.metadata.annotations.secret\.kuadrant\.io/user-id
+                groups:
+                  selector: auth.identity.metadata.annotations.kuadrant\.io/groups
+#        headers:
+#          x-user-id:
+#            selector: auth.identity.userid
+#          x-user-groups:
+#            selector: auth.identity.groups
+#          x-auth-method:
+#            value: api-key
+    authorization:
+      allow-groups:
+        opa:
+          rego: |
+            groups := split(object.get(input.auth.identity.metadata.annotations, "kuadrant.io/groups", ""), ",")
+            allow { groups[_] == "admin" }
+            allow { groups[_] == "developer" }
+            allow { groups[_] == "user" }
+            allow { groups[_] == "readonly" }
+---
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: qwen-auth-policy
+  namespace: llm
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: qwen-route
+  rules:
+    authentication:
+      api-key-users:
+        apiKey:
+          allNamespaces: true
+          selector:
+            matchLabels:
+              app: models-api
+        credentials:
+          authorizationHeader:
+            prefix: APIKEY
+    response:
+      success:
+        filters:
+          identity:
+            json:
+              properties:
+                userid:
+                  selector: auth.identity.metadata.annotations.secret\.kuadrant\.io/user-id
+                groups:
+                  selector: auth.identity.metadata.annotations.kuadrant\.io/groups
+ #        headers:
+ #          x-user-id:
+ #            selector: auth.identity.userid
+ #          x-user-groups:
+ #            selector: auth.identity.groups
+ #          x-auth-method:
+ #            value: api-key
+    authorization:
+      allow-groups:
+        opa:
+          rego: |
+            groups := split(object.get(input.auth.identity.metadata.annotations, "kuadrant.io/groups", ""), ",")
+            allow { groups[_] == "admin" }
+            allow { groups[_] == "developer" }
+            allow { groups[_] == "user" }
+            allow { groups[_] == "readonly" }
+---
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: nomic-auth-policy
+  namespace: llm
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: nomic-route
+  rules:
+    authentication:
+      api-key-users:
+        apiKey:
+          allNamespaces: true
+          selector:
+            matchLabels:
+              app: models-api
+        credentials:
+          authorizationHeader:
+            prefix: APIKEY
+    response:
+      success:
+        filters:
+          identity:
+            json:
+              properties:
+                userid:
+                  selector: auth.identity.metadata.annotations.secret\.kuadrant\.io/user-id
+                groups:
+                  selector: auth.identity.metadata.annotations.kuadrant\.io/groups
+ #        headers:
+ #          x-user-id:
+ #            selector: auth.identity.userid
+ #          x-user-groups:
+ #            selector: auth.identity.groups
+ #          x-auth-method:
+ #            value: api-key
+    authorization:
+      allow-groups:
+        opa:
+          rego: |
+            groups := split(object.get(input.auth.identity.metadata.annotations, "kuadrant.io/groups", ""), ",")
+            allow { groups[_] == "admin" }
+            allow { groups[_] == "developer" }
+            allow { groups[_] == "user" }
+            allow { groups[_] == "readonly" }
