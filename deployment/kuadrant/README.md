@@ -100,11 +100,12 @@ kubectl apply --server-side -f https://github.com/kserve/kserve/releases/downloa
 # Wait for KServe controller to be ready
 kubectl wait --for=condition=Available deployment/kserve-controller-manager -n kserve --timeout=300s
 
-# Configure KServe for RawDeployment mode (no Knative required)
-kubectl patch configmap/inferenceservice-config -n kserve --type=strategic -p '{"data": {"deploy": "{\"defaultDeploymentMode\": \"RawDeployment\"}"}}'
+# Configure KServe for Gateway API integration
+kubectl apply -f 01-kserve-config.yaml
 
-# Configure for Gateway API integration
-kubectl patch configmap/inferenceservice-config -n kserve --type=strategic -p '{"data": {"ingress": "{\"enableGatewayApi\": true, \"kserveIngressGateway\": \"kuadrant-gateway.llm\"}"}}'
+# Restart KServe controller to pick up new configuration
+kubectl rollout restart deployment/kserve-controller-manager -n kserve
+kubectl wait --for=condition=Available deployment/kserve-controller-manager -n kserve --timeout=120s
 
 
 # Alt install:
@@ -128,10 +129,11 @@ kubectl get secret kserve-webhook-server-cert -n kserve --watch
 kubectl rollout status deployment/kserve-controller-manager -n kserve --timeout=300s
 
 # Configure KServe
-kubectl patch configmap/inferenceservice-config -n kserve --type=strategic \
-  -p '{"data": {"deploy": "{\"defaultDeploymentMode\": \"RawDeployment\"}"}}'
-kubectl patch configmap/inferenceservice-config -n kserve --type=strategic \
-  -p '{"data": {"ingress": "{\"enableGatewayApi\": true, \"kserveIngressGateway\": \"kuadrant-gateway.llm\"}"}}'
+kubectl apply -f 01-kserve-config.yaml
+
+# Restart KServe controller to pick up new configuration
+kubectl rollout restart deployment/kserve-controller-manager -n kserve
+kubectl wait --for=condition=Available deployment/kserve-controller-manager -n kserve --timeout=120s
 
 # View configmap
 kubectl get configmap inferenceservice-config -n kserve -o yaml
@@ -187,32 +189,35 @@ kubectl wait --for=condition=Available deployment/minio -n minio-system --timeou
 Deploy actual AI models using KServe InferenceServices with GPU acceleration:
 
 ```bash
-# Deploy the vLLM ServingRuntime (if not already deployed)
-kubectl apply -f ../model_serving/granite-code-vllm-raw.yaml -n llm
+# Deploy the latest vLLM ServingRuntime with Qwen3 support
+kubectl apply -f ../model_serving/vllm-latest-runtime.yaml
 
-# Deploy all AI models including the new Qwen3-0.6B model
-kubectl apply -f ../model_serving/ -n llm
+# Deploy the Qwen3-0.6B model (recommended for testing)
+kubectl apply -f ../model_serving/qwen3-0.6b-vllm-raw.yaml
 
 # Monitor InferenceService deployment status
 kubectl get inferenceservice -n llm
 
-# Watch specific model deployment (takes 5-10 minutes for model download)
+# Watch model deployment (takes 5-10 minutes for model download)
 kubectl describe inferenceservice qwen3-0-6b-instruct -n llm
-kubectl describe inferenceservice granite-8b-code-instruct-128k -n llm
-kubectl describe inferenceservice mistral-7b-instruct -n llm
 
 # Check if pods are running (may take 5-15 minutes for model downloads)
 kubectl get pods -n llm -l serving.kserve.io/inferenceservice
 
-# Wait for all models to be ready
-kubectl wait --for=condition=Ready inferenceservice --all -n llm --timeout=900s
+# Follow logs to see model loading progress
+kubectl logs -n llm -l serving.kserve.io/inferenceservice -c kserve-container -f
+
+# Wait for model to be ready
+kubectl wait --for=condition=Ready inferenceservice qwen3-0-6b-instruct -n llm --timeout=900s
 ```
 
 **Available Models:**
-- **Qwen3-0.6B**: Fast, efficient chat model (hf://Qwen/Qwen2.5-0.5B-Instruct)
+- **Qwen3-0.6B**: Fast, efficient chat model (hf://Qwen/Qwen3-0.6B) ✅ **WORKING**
 - **Granite-8B**: IBM's code-focused chat model  
 - **Mistral-7B**: General purpose chat model
 - **Nomic-Embed**: Text embeddings model
+
+**Note**: Qwen3-0.6B requires the new `vllm-latest` ServingRuntime for compatibility.
 
 **GPU Requirements:**
 - Each model requires 1 GPU
@@ -245,11 +250,13 @@ curl -H 'Host: localhost' http://localhost:8000/health
 **Port Forwarding Endpoints:**
 ```bash
 # Model endpoints (with API key) - Chat Completions
+# Qwen3-0.6B Model (WORKING)
 curl -H 'Authorization: APIKEY admin-key-12345' \
      -H 'Content-Type: application/json' \
-     -d '{"model":"qwen","messages":[{"role":"user","content":"Hello! Write a Python function."}]}' \
-     http://localhost:8000/qwen/v1/chat/completions
+     -d '{"model":"qwen3-0-6b-instruct","messages":[{"role":"user","content":"Hello! Write a Python function."}]}' \
+     http://localhost:8000/qwen3/v1/chat/completions
 
+# Other models (require setup)
 curl -H 'Authorization: APIKEY admin-key-12345' \
      -H 'Content-Type: application/json' \
      -d '{"model":"granite","messages":[{"role":"user","content":"Hello"}]}' \

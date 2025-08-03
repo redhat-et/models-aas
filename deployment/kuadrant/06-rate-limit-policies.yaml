@@ -3,6 +3,32 @@
 apiVersion: kuadrant.io/v1beta2
 kind: RateLimitPolicy
 metadata:
+  name: qwen3-rate-limit
+  namespace: llm
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: qwen3-route
+  limits:
+    "requests-per-minute":
+      rates:
+        - limit: 150
+          duration: 1m
+          unit: request
+      counters:
+        - metadata.filter_metadata.envoy\.common\.jwt.sub
+    "requests-per-hour":
+      rates:
+        - limit: 1500
+          duration: 1h
+          unit: request
+      counters:
+        - metadata.filter_metadata.envoy\.common\.jwt.sub
+---
+apiVersion: kuadrant.io/v1beta2
+kind: RateLimitPolicy
+metadata:
   name: granite-rate-limit
   namespace: llm
 spec:

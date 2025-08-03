@@ -19,20 +19,20 @@ spec:
       modelFormat:
         name: vLLM
       name: ''
-      modelUri: hf://Qwen/Qwen2.5-0.5B-Instruct  # Using the more stable 2.5 variant
+      storageUri: hf://Qwen/Qwen3-0.6B
       resources:
         limits:
           cpu: '4'
           memory: 8Gi
           nvidia.com/gpu: '1'
         requests:
-          cpu: '2'
+          cpu: '1'
           memory: 4Gi
           nvidia.com/gpu: '1'
-      runtime: vllm-2.12-6144
+      runtime: vllm-latest
       env:
         - name: HF_TOKEN
-          value: ""  # Add your HF token here if needed for private models
+          value: ""
     tolerations:
       - effect: NoSchedule
         key: nvidia.com/gpu

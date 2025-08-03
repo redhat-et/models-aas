@@ -64,6 +64,9 @@ kubectl get gateway -n llm
 Let's start with the smallest, fastest model:
 
 ```bash
+# IMPORTANT: Deploy the latest vLLM runtime first (supports Qwen3)
+kubectl apply -f ../model_serving/vllm-latest-runtime.yaml
+
 # Deploy the Qwen model InferenceService
 kubectl apply -f ../model_serving/qwen3-0.6b-vllm-raw.yaml
 
@@ -77,11 +80,12 @@ kubectl get pods -n llm -l serving.kserve.io/inferenceservice
 
 **What happens internally:**
 1. KServe controller sees the InferenceService
-2. Creates a Deployment with your model specification
+2. Creates a Deployment with your model specification  
 3. Kubernetes schedules a pod with GPU resources
-4. Pod downloads model from HuggingFace (5-10 minutes)
-5. vLLM starts serving the model on port 8080
-6. KServe creates a Service to expose the pod
+4. Storage-initializer downloads Qwen3-0.6B model from HuggingFace (1-2 minutes)
+5. Latest vLLM image loads the model with Qwen3 support (2-3 minutes)
+6. vLLM starts serving the model on port 8080
+7. KServe creates a Service to expose the pod
 
 ## Step 3: Verify Model Pod is Running
 
@@ -143,8 +147,8 @@ kubectl port-forward -n istio-system svc/istio-ingressgateway 8000:80 &
 # Test the model endpoint
 curl -H 'Authorization: APIKEY admin-key-12345' \
      -H 'Content-Type: application/json' \
-     -d '{"messages":[{"role":"user","content":"Hello! Write a Python function."}]}' \
-     http://localhost:8000/qwen/v1/chat/completions
+     -d '{"model":"qwen3-0-6b-instruct","messages":[{"role":"user","content":"Hello! Write a Python function."}]}' \
+     http://localhost:8000/qwen3/v1/chat/completions
 
 # Expected: JSON response with AI-generated text
 ```
@@ -250,10 +254,16 @@ kubectl get pods -n llm -l serving.kserve.io/inferenceservice
 
 ## Key Files Explained
 
-- **`../model_serving/qwen3-0.6b-vllm-raw.yaml`**: Defines the InferenceService
-- **`05-model-routing.yaml`**: HTTPRoute connecting `/qwen` to the model service  
+- **`../model_serving/vllm-latest-runtime.yaml`**: Latest vLLM ServingRuntime with Qwen3 support
+- **`../model_serving/qwen3-0.6b-vllm-raw.yaml`**: Defines the Qwen3-0.6B InferenceService
+- **`05-model-routing.yaml`**: HTTPRoute connecting `/qwen3` to the model service  
 - **`08-auth-policies-apikey.yaml`**: API key authentication for the route
 - **`06-rate-limit-policies.yaml`**: Rate limiting policies per model
 - **`07-api-key-secrets.yaml`**: API key secrets for user access
+
+**New vLLM Runtime Features:**
+- Uses `vllm/vllm-openai:latest` image for latest model support
+- Includes `--trust-remote-code` for Qwen3 compatibility
+- Serves on port 8080 with full OpenAI API compatibility
 
 The beauty of this architecture is that each model gets its own InferenceService, Pod, Service, HTTPRoute, and policies - providing complete isolation and independent scaling.

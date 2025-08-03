@@ -5,6 +5,20 @@ kind: Namespace
 metadata:
   name: minio-system
 ---
+# PersistentVolumeClaim for MinIO data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-pvc
+  namespace: minio-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: standard
+---
 # MinIO deployment
 apiVersion: apps/v1
 kind: Deployment
@@ -65,7 +79,8 @@ spec:
           periodSeconds: 30
       volumes:
       - name: data
-        emptyDir: {}
+        persistentVolumeClaim:
+          claimName: minio-pvc
 ---
 # MinIO Service
 apiVersion: v1
