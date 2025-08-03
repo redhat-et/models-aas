@@ -22,18 +22,19 @@ spec:
       storageUri: hf://Qwen/Qwen3-0.6B
       resources:
         limits:
-          cpu: '4'
+#          cpu: '4'
           memory: 8Gi
-          nvidia.com/gpu: '1'
+#          nvidia.com/gpu: '1'
         requests:
-          cpu: '1'
+#          cpu: '1'
           memory: 4Gi
-          nvidia.com/gpu: '1'
+#          nvidia.com/gpu: '1'
       runtime: vllm-latest
       env:
         - name: HF_TOKEN
           value: ""
-    tolerations:
-      - effect: NoSchedule
-        key: nvidia.com/gpu
-        operator: Exists
+#    tolerations:
+#      - effect: NoSchedule
+#        key: nvidia.com/gpu
+#        operator: Exists
+

@@ -4,11 +4,11 @@ This repository demonstrates how to deploy a Models-as-a-Service platform using 
 
 ## Architecture Overview
 
-**Gateway:** Istio Gateway + Envoy with Kuadrant policies  
-**Models:** KServe InferenceServices (Granite, Mistral, Nomic)  
-**Authentication:** API Keys (simple) or Keycloak (Red Hat SSO)  
-**Rate Limiting:** Kuadrant RateLimitPolicy with Redis backend  
-**Observability:** Prometheus + Grafana with custom LLM metrics
+**Gateway:** Istio + Envoy with Kuadrant policies
+**Models:** KServe InferenceServices (Granite, Mistral, Nomic, Qwen, Simulator)
+**Authentication:** API Keys (simple) or Keycloak (Red Hat SSO)  (TODO: not implemented, static keys currently)
+**Rate Limiting:** Kuadrant RateLimitPolicy with Redis backend (Limitador redis yaml included but not tested and probably not working)
+**Observability:** Prometheus + Grafana with custom LLM metrics (TODO: setup chargeback prom)
 
 ### Key Components
 
@@ -27,53 +27,81 @@ This repository demonstrates how to deploy a Models-as-a-Service platform using 
 1. You apply an InferenceService YAML
    ↓
 2. KServe Controller sees the InferenceService
-   ↓  
+   ↓
 3. KServe creates a Deployment for your model
    ↓
 4. Deployment creates Pod(s) with:
    - GPU allocation
-   - Model download from HuggingFace  
+   - Model download from HuggingFace
    - vLLM or other serving runtime
    ↓
 5. Pod starts serving model on port 8080
    ↓
-6. Kubernetes Service exposes the pod
-   ↓  
+6. Kube Service exposes the pod
+   ↓
 7. HTTPRoute connects gateway to the service
    ↓
 8. Kuadrant policies protect the route
 ```
 
-**Key Point**: Without applying InferenceService YAMLs, you get no model pods! The InferenceService is what triggers KServe to create the actual AI model containers.
+**Key Point**: Without applying InferenceService YAMLs, you get no model pods. The InferenceService is what triggers KServe to create the actual AI model containers.
 
 ## Prerequisites
 
-- Kubernetes cluster (v1.25+) or minikube
-- kubectl configured for your cluster
-- Cluster admin permissions
-- For minikube: `minikube start --memory=8192 --cpus=4`
+- Kubernetes cluster with admin access
+- kubectl configured
+- For KIND clusters: `kind create cluster --name llm-maas`
+- For minikube with GPU: `minikube start --driver docker --container-runtime docker --gpus all --memory no-limit --cpus no-limit`
 
-## Quick Start (Manual Deployment)
+## 🚀 Quick Start (Automated Installer)
+
+**For KIND clusters (no GPU):**
+```bash
+cd ~/rhmaas/models-aas/deployment/kuadrant
+./install.sh --simulator
+```
+
+**For GPU clusters:**
+```bash
+cd ~/rhmaas/models-aas/deployment/kuadrant  
+./install.sh --qwen3
+```
+
+The installer will:
+- ✅ Deploy Istio + Gateway API + KServe + Kuadrant
+- ✅ Configure gateway-level authentication and rate limiting
+- ✅ Deploy your chosen model (simulator or Qwen3-0.6B)
+- ✅ Set up tiered API keys (Free/Premium/Enterprise)
+- ✅ Show you the port-forward and test commands
+
+**After installation, run the port-forward command shown to access your API!**
+
+---
+
+## Manual Deployment (Advanced)
 
 Follow the manual deployment steps below for full understanding and control over your MaaS deployment.
 
 ## Manual Deployment Instructions
 
+```shell
+git clone xxx
+cd deployment/kuadrant
+```
+
 ### 1. Install Istio and Gateway API
 
 Install Istio and Gateway API CRDs using the provided script:
 
+- Install Gateway API CRDs
+- Install Istio base components and Istiod
+
 ```bash
-cd deployment/kuadrant
 chmod +x istio-install.sh
 ./istio-install.sh apply
 ```
 
-This script will:
-
-- Install Gateway API CRDs
-- Install Istio base components and Istiod
-- Create the required namespaces (`llm` and `llm-observability`)
+This manifest will create the required namespaces (`llm` and `llm-observability`)
 
 Create additional namespaces:
 
@@ -107,38 +135,10 @@ kubectl apply -f 01-kserve-config.yaml
 kubectl rollout restart deployment/kserve-controller-manager -n kserve
 kubectl wait --for=condition=Available deployment/kserve-controller-manager -n kserve --timeout=120s
 
-
-# Alt install:
-
-
-# Install cert-manager
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.18.2/cert-manager.yaml
-kubectl wait --for=condition=Available deployment/cert-manager -n cert-manager --timeout=300s
-kubectl wait --for=condition=Available deployment/cert-manager-cainjector -n cert-manager --timeout=300s
-kubectl wait --for=condition=Available deployment/cert-manager-webhook -n cert-manager --timeout=300s
-
-# Install KServe (server-side apply avoids the 256 KiB annotation limit on CRDs)
-kubectl apply --server-side --force-conflicts \
-  -f https://github.com/kserve/kserve/releases/download/v0.15.2/kserve.yaml \
-  --field-manager="kserve-install"
-
-# Wait for cert-manager to mint the webhook TLS secret
-kubectl get secret kserve-webhook-server-cert -n kserve --watch
-
-# Wait for KServe controller to be ready
-kubectl rollout status deployment/kserve-controller-manager -n kserve --timeout=300s
-
-# Configure KServe
-kubectl apply -f 01-kserve-config.yaml
-
-# Restart KServe controller to pick up new configuration
-kubectl rollout restart deployment/kserve-controller-manager -n kserve
-kubectl wait --for=condition=Available deployment/kserve-controller-manager -n kserve --timeout=120s
-
-# View configmap
+# View inferenceervice configmap
 kubectl get configmap inferenceservice-config -n kserve -o yaml
 
-$ kubectl get configmap inferenceservice-config -n kserve \
+kubectl get configmap inferenceservice-config -n kserve \
   -o jsonpath='{.data.deploy}{"\n"}{.data.ingress}{"\n"}'
 
 # Output
@@ -147,18 +147,30 @@ $ kubectl get configmap inferenceservice-config -n kserve \
 
 ```
 
-### 3. Install Kuadrant Operator
+### 3. Configure Gateway and Routing
+
+The configuration is pre-configured for domain-based routing. Deploy the Gateway and routing configuration:
+
+```bash
+kubectl apply -f 02-gateway-configuration.yaml
+kubectl apply -f 03-model-routing-domains.yaml
+```
+
+**Note:** If you want to use a different domain, update the hostnames in the files before applying.
+
+### 4. Install Kuadrant Operator
 
 ```bash
 # Option 1: Using Helm (recommended)
+
 helm repo add kuadrant https://kuadrant.io/helm-charts
 helm repo update
+
 helm install kuadrant-operator kuadrant/kuadrant-operator \
   --create-namespace \
   --namespace kuadrant-system
 
-# Option 2: Using manifests
-kubectl apply -f 02-kuadrant-operator.yaml
+kubectl apply -f 04-kuadrant-operator.yaml
 
 # Wait for the operator to be ready
 kubectl wait --for=condition=Available deployment/kuadrant-operator-controller-manager -n kuadrant-system --timeout=300s
@@ -166,15 +178,15 @@ kubectl wait --for=condition=Available deployment/kuadrant-operator-controller-m
 # If the status does not become ready try kicking the operator:
 kubectl rollout restart deployment kuadrant-operator-controller-manager -n kuadrant-system
 
-# Deploy Kuadrant instance
-kubectl apply -f 03-kuadrant-instance.yaml
-
-# Wait for Kuadrant components to be ready
-kubectl wait --for=condition=Available deployment/limitador -n kuadrant-system --timeout=300s
-kubectl wait --for=condition=Available deployment/authorino -n kuadrant-system --timeout=300s
+# Deploy Kuadrant instance HA Limitador (Not tested)
+#kubectl apply -f 03-kuadrant-instance.yaml
+#
+## Wait for Kuadrant components to be ready
+#kubectl wait --for=condition=Available deployment/limitador -n kuadrant-system --timeout=300s
+#kubectl wait --for=condition=Available deployment/authorino -n kuadrant-system --timeout=300s
 ```
 
-### 4. Deploy Local Storage (for minikube/local development)
+### 5. Deploy Local Storage (for minikube/local development)
 
 ```bash
 # Deploy MinIO for S3-compatible local storage
@@ -184,9 +196,10 @@ kubectl apply -f minio-local-storage.yaml
 kubectl wait --for=condition=Available deployment/minio -n minio-system --timeout=300s
 ```
 
-### 5. Deploy AI Models with KServe
+### 7. Deploy AI Models with KServe
 
-Deploy actual AI models using KServe InferenceServices with GPU acceleration:
+> Option 1 Deploy models using KServe InferenceServices on a GPU accelerator:
+> There is an added example of how to set the runtime with kserve via `vllm-latest-runtime.yaml`
 
 ```bash
 # Deploy the latest vLLM ServingRuntime with Qwen3 support
@@ -211,300 +224,152 @@ kubectl logs -n llm -l serving.kserve.io/inferenceservice -c kserve-container -f
 kubectl wait --for=condition=Ready inferenceservice qwen3-0-6b-instruct -n llm --timeout=900s
 ```
 
-**Available Models:**
-- **Qwen3-0.6B**: Fast, efficient chat model (hf://Qwen/Qwen3-0.6B) ✅ **WORKING**
-- **Granite-8B**: IBM's code-focused chat model  
-- **Mistral-7B**: General purpose chat model
-- **Nomic-Embed**: Text embeddings model
+> Option 2 - If in a KIND environment or non-GPU use:
 
-**Note**: Qwen3-0.6B requires the new `vllm-latest` ServingRuntime for compatibility.
-
-**GPU Requirements:**
-- Each model requires 1 GPU
-- Qwen3-0.6B: ~2GB VRAM (minimal requirements)
-- Granite-8B: ~16GB VRAM  
-- Mistral-7B: ~14GB VRAM
-- Nomic-Embed: ~4GB VRAM
-
-**Model Download Process:**
-KServe automatically downloads models from HuggingFace on first deployment. This can take 5-15 minutes depending on model size and network speed.
-
-### 6. Start Port Forwarding for Local Access
-
-Since you're running on minikube, you need port forwarding to access the models:
-
-```bash
-# Option 1: Use the automated script
-./localhost-setup.sh start
-
-# Option 2: Manual port forwarding
-kubectl port-forward -n istio-system svc/istio-ingressgateway 8000:80 &
-
-# Wait a moment for port-forward to establish
-sleep 5
-
-# Test connectivity
-curl -H 'Host: localhost' http://localhost:8000/health
+```shell
+kubectl apply -f ../model_serving/vllm-simulator-kserve.yaml
 ```
 
-**Protected API Endpoints (✅ WORKING):**
+### 6. Configure Authentication and Rate Limiting
 
-**Setup Required**: Port-forward to Istio gateway for authentication:
-```bash
-kubectl port-forward -n llm svc/kuadrant-gateway-istio 8000:80 &
-```
-
-**Qwen3-0.6B Model** (✅ Authentication Working):
-```bash
-# With API key (REQUIRED)
-curl -H 'Authorization: APIKEY admin-key-12345' \
-     -H 'Content-Type: application/json' \
-     -d '{"model":"qwen3-0-6b-instruct","messages":[{"role":"user","content":"Hello! Write a Python function."}]}' \
-     http://localhost:8000/qwen3/v1/chat/completions
-
-# Without API key (BLOCKED - this will hang/timeout)
-curl -H 'Content-Type: application/json' \
-     -d '{"model":"qwen3-0-6b-instruct","messages":[{"role":"user","content":"Hello"}]}' \
-     http://localhost:8000/qwen3/v1/chat/completions
-```
-
-# Other models (require setup)
-curl -H 'Authorization: APIKEY admin-key-12345' \
-     -H 'Content-Type: application/json' \
-     -d '{"model":"granite","messages":[{"role":"user","content":"Hello"}]}' \
-     http://localhost:8000/granite/v1/chat/completions
-
-curl -H 'Authorization: APIKEY admin-key-12345' \
-     -H 'Content-Type: application/json' \
-     -d '{"model":"mistral","messages":[{"role":"user","content":"Hello"}]}' \
-     http://localhost:8000/mistral/v1/chat/completions
-
-# Embeddings endpoint
-curl -H 'Authorization: APIKEY admin-key-12345' \
-     -H 'Content-Type: application/json' \
-     -d '{"input":"Hello world","model":"nomic-embed"}' \
-     http://localhost:8000/nomic/embeddings
-
-# Monitoring endpoints
-kubectl port-forward -n istio-system svc/prometheus 9090 &
-kubectl port-forward -n istio-system svc/grafana 3000 &
-```
-
-**Available API Keys:**
-- **Admin**: `admin-key-12345` (full access)
-- **Developer**: `dev-key-67890` (standard access)  
-- **User**: `user-key-abcdef` (limited access)
-- **Readonly**: `readonly-key-999` (monitoring access)
-
-### 7. Configure Gateway and Routing
-
-The configuration is pre-configured for localhost. Deploy the Gateway and routing configuration:
-
-```bash
-kubectl apply -f 04-gateway-configuration.yaml
-kubectl apply -f 05-model-routing.yaml
-```
-
-**Note:** If you want to use a different domain, update the hostnames in the files before applying.
-
-### 8. Configure Authentication
-
-**Option A: Simple API Key Authentication (Recommended)**
-
-Deploy API key secrets and auth policies:
+Deploy API key secrets, auth policies, and rate limiting:
 
 ```bash
 # Create API key secrets
-kubectl apply -f 07-api-key-secrets.yaml
+kubectl apply -f 05-api-key-secrets.yaml
 
 # Apply API key-based auth policies
-kubectl apply -f 08-auth-policies-apikey.yaml
+kubectl apply -f 06-auth-policies-apikey.yaml
+
+# Apply rate limiting policies
+kubectl apply -f 07-rate-limit-policies.yaml
+
+# Kick the kuadrant controller if you dont see a limitador-limitador deployment or no rate-limiting
+kubectl rollout restart deployment kuadrant-operator-controller-manager -n kuadrant-system
 ```
 
-This creates API keys for different user roles:
-- `admin-key-12345` - Administrator access
-- `dev-key-67890` - Developer access  
-- `user-key-abcdef` - Standard user access
-- `readonly-key-999` - Read-only access
+### 7. Start Port Forwarding for Local Access
 
-**Option B: Keycloak Authentication (Legacy)**
-
-For Keycloak-based authentication (requires Keycloak server):
+If running on kind/minikube, you need port forwarding to access the models:
 
 ```bash
-kubectl apply -f 07-auth-policies.yaml
+# Port-forward to Kuadrant gateway (REQUIRED for authentication)
+kubectl port-forward -n llm svc/kuadrant-gateway-istio 8000:80 &
 ```
 
-**Note:** If you have Keycloak running elsewhere, update the `issuerUrl` in the file before applying.
+### 8. Test the MaaS API
 
-### 9. Apply Rate Limiting Policies
+Test all user tiers and rate limits with the automated script:
 
 ```bash
-kubectl apply -f 06-rate-limit-policies.yaml
+# Test simulator model (default)
+./scripts/test-request-limits.sh
+
+# Test qwen3 model when ready
+./scripts/test-request-limits.sh --host qwen3.maas.local --model qwen3-0-6b-instruct
 ```
 
-### 10. Deploy Observability
+Example output showing rate limiting in action:
+
+```bash
+📡  Host    : simulator.maas.local
+🤖  Model ID: simulator-model
+
+=== Free User (5 requests per 2min) ===
+Free req #1  -> 200
+Free req #2  -> 200
+Free req #3  -> 200
+Free req #4  -> 200
+Free req #5  -> 200
+Free req #6  -> 429
+Free req #7  -> 429
+
+=== Premium User 1 (20 requests per 2min) ===
+Premium1 req #1  -> 200
+Premium1 req #2  -> 200
+...
+Premium1 req #20 -> 200
+Premium1 req #21 -> 429
+Premium1 req #22 -> 429
+
+=== Premium User 2 (20 requests per 2min) ===
+Premium2 req #1  -> 200
+...
+Premium2 req #20 -> 200
+Premium2 req #21 -> 429
+Premium2 req #22 -> 429
+
+=== Second Free User (5 requests per 2min) ===
+Free2 req #1  -> 200
+...
+Free2 req #5  -> 200
+Free2 req #6  -> 429
+Free2 req #7  -> 429
+```
+
+Test individual models with manual curl commands:
+
+**Simulator Model:**
+
+```bash
+# Single request test
+curl -s -H 'Authorization: APIKEY freeuser1_key' \
+     -H 'Content-Type: application/json' \
+     -d '{"model":"simulator-model","messages":[{"role":"user","content":"Hello!"}]}' \
+     http://simulator.maas.local:8000/v1/chat/completions
+
+# Test rate limiting (Free tier: 5 requests per 2min)
+for i in {1..7}; do
+  printf "Free tier request #%-2s -> " "$i"
+  curl -s -o /dev/null -w "%{http_code}\n" \
+       -X POST http://simulator.maas.local:8000/v1/chat/completions \
+       -H 'Authorization: APIKEY freeuser1_key' \
+       -H 'Content-Type: application/json' \
+       -d '{"model":"simulator-model","messages":[{"role":"user","content":"Test request"}],"max_tokens":10}'
+done
+```
+
+**Qwen3 Model:**
+
+```bash
+# Single request test
+curl -s -H 'Authorization: APIKEY premiumuser1_key' \
+     -H 'Content-Type: application/json' \
+     -d '{"model":"qwen3-0-6b-instruct","messages":[{"role":"user","content":"Hello!"}]}' \
+     http://qwen3.maas.local:8000/v1/chat/completions
+
+# Test rate limiting (Premium tier: 20 requests per 2min)
+for i in {1..22}; do
+  printf "Premium tier request #%-2s -> " "$i"
+  curl -s -o /dev/null -w "%{http_code}\n" \
+       -X POST http://qwen3.maas.local:8000/v1/chat/completions \
+       -H 'Authorization: APIKEY premiumuser1_key' \
+       -H 'Content-Type: application/json' \
+       -d '{"model":"qwen3-0-6b-instruct","messages":[{"role":"user","content":"Test request"}],"max_tokens":10}'
+done
+```
+
+**Available API Keys and Rate Limits:**
+
+| Tier | API Keys | Rate Limits (per 2min) |
+|------|----------|------------------------|
+| **Free** | `freeuser1_key`, `freeuser2_key` | 5 requests |
+| **Premium** | `premiumuser1_key`, `premiumuser2_key` | 20 requests |
+
+- Expected Responses
+
+- ✅ **200**: Request successful
+- ❌ **429**: Rate limit exceeded (too many requests)
+- ❌ **401**: Invalid/missing API key
+
+### 9. Deploy Observability
 
 ```bash
 kubectl apply -f 08-observability.yaml
 kubectl apply -f 09-monitoring-dashboard.yaml
 ```
 
-### 11. Set Up Localhost Access for Protected APIs
-
-**IMPORTANT**: To use authentication and API protection, you MUST port-forward to the Istio gateway service, not directly to model services.
-
-```bash
-# Port-forward to Istio gateway (REQUIRED for authentication)
-kubectl port-forward -n llm svc/kuadrant-gateway-istio 8000:80 &
-
-# Wait for port-forward to establish
-sleep 2
-
-# Test connectivity
-curl -H 'Host: localhost' http://localhost:8000/health
-```
-
-**Alternative**: Use the localhost setup script (if available):
-
-```bash
-chmod +x localhost-setup.sh
-./localhost-setup.sh start
-```
-
-This will set up port-forwards for:
-- **API Gateway**: http://localhost:8000 (✅ **Authentication enforced**)
-- Prometheus: http://localhost:9090 (if available)  
-- Grafana: http://localhost:3000 (if available)
-- Keycloak: http://localhost:8080 (if available)
-
-## API Usage
-
-### Endpoints
-
-With Kuadrant via localhost port-forwarding, your models are accessible at:
-
-- **Granite Code Model**: `http://localhost:8000/granite/`
-- **Mistral Model**: `http://localhost:8000/mistral/`
-- **Nomic Embeddings**: `http://localhost:8000/nomic/`
-
-### Authentication
-
-All requests require a valid JWT token from Keycloak:
-
-```bash
-# Get token from Keycloak (if authentication is enabled)
-TOKEN=$(curl -X POST \
-  http://localhost:8080/auth/realms/maas/protocol/openid-connect/token \
-  -H 'Content-Type: application/x-www-form-urlencoded' \
-  -d 'client_id=your-client-id' \
-  -d 'client_secret=your-client-secret' \
-  -d 'grant_type=client_credentials' | jq -r '.access_token')
-
-# Make API request
-curl -X POST \
-  http://localhost:8000/granite/chat/completions \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "granite-8b-code-instruct-128k",
-    "messages": [{"role": "user", "content": "Hello!"}]
-  }'
-```
-
-### Rate Limits
-
-Default rate limits per user:
-- **Granite**: 100 requests/minute, 1000 requests/hour
-- **Mistral**: 50 requests/minute, 500 requests/hour  
-- **Nomic**: 200 requests/minute, 2000 requests/hour
-
-Rate limits are enforced per authenticated user (JWT subject).
-
-## Monitoring and Observability
-
-### Prometheus Metrics
-
-Kuadrant automatically exposes metrics for:
-- Request rate by model
-- Token usage (prompt, completion, total)
-- Response times
-- Error rates
-- Rate limit hits
-
-### Grafana Dashboard
-
-A pre-configured Grafana dashboard is available at `09-monitoring-dashboard.yaml`. Import this into your Grafana instance to visualize:
-
-- Model usage patterns
-- Token consumption
-- Performance metrics
-- Rate limiting effectiveness
-
-### Accessing Metrics
-
-Use the localhost setup script to manage port-forwards:
-
-```bash
-# Start all port-forwards (including monitoring)
-./localhost-setup.sh start
-
-# Check status
-./localhost-setup.sh status
-
-# Stop all port-forwards
-./localhost-setup.sh stop
-```
-
-Or manually:
-
-```bash
-# Forward Prometheus port
-kubectl port-forward -n istio-system svc/prometheus 9090
-
-# Forward Grafana port (if deployed)
-kubectl port-forward -n istio-system svc/grafana 3000
-```
-
-## Migration from 3scale
-
-### Key Differences
-
-| Feature | 3scale | Kuadrant |
-|---------|--------|----------|
-| Gateway | APIcast | Istio + Envoy |
-| API Definition | OpenAPI in 3scale | HTTPRoute resources |
-| Rate Limiting | 3scale policies | RateLimitPolicy CRDs |
-| Authentication | 3scale auth | AuthPolicy CRDs |
-| Metrics | Custom LLM policy | Istio telemetry + custom metrics |
-| Portal | 3scale Developer Portal | External portal (can integrate via API) |
-
-### Migration Benefits
-
-- **Cloud-Native**: Built on Kubernetes and Istio
-- **GitOps-Friendly**: All configuration in YAML
-- **Vendor-Neutral**: Uses open standards (Gateway API)
-- **Scalable**: Leverages Istio's performance and reliability
-- **Observable**: Rich metrics and tracing out of the box
-
 ## Troubleshooting
-
-### Check Component Status
-
-```bash
-# Verify all components are running
-kubectl get pods -n kuadrant-system
-kubectl get pods -n istio-system
-kubectl get pods -n llm
-
-# Check Gateway status
-kubectl get gateway -n llm
-kubectl get httproute -n llm
-
-# Verify policies are applied
-kubectl get ratelimitpolicy -n llm
-kubectl get authpolicy -n llm
-```
 
 ### View Logs
 
@@ -524,10 +389,8 @@ kubectl logs -n kuadrant-system deployment/authorino
 
 ### Common Issues
 
-1. **502 Bad Gateway**: Check if model services are running and healthy
-2. **Rate Limit Errors**: Verify Redis is accessible and RateLimitPolicy is applied
-3. **Auth Failures**: Confirm Keycloak URL and realm configuration
-4. **No Metrics**: Ensure ServiceMonitor is created and Prometheus is scraping
+- **502 Bad Gateway**: Check if model services are running and healthy
+- **No Rate Limiting or Auth**: Kick the kuadrant-operator-controller-manager
 
 ## Customization
 
@@ -544,29 +407,6 @@ limits:
         unit: request
 ```
 
-### Adding New Models
-
-1. Deploy new KServe InferenceService
-2. Create HTTPRoute for the new model
-3. Apply RateLimitPolicy and AuthPolicy
-4. Update monitoring configuration
-
-### Custom Authentication
-
-Modify AuthPolicy resources to integrate with different identity providers:
-
-```yaml
-authentication:
-  "custom-auth":
-    apiKey:
-      selector:
-        matchLabels:
-          app: my-app
-    credentials:
-      authorizationHeader:
-        prefix: "ApiKey "
-```
-
 ## Performance Tuning
 
 ### Gateway Scaling
@@ -575,149 +415,7 @@ authentication:
 # Scale Istio gateway
 kubectl scale deployment/istio-ingressgateway -n istio-system --replicas=3
 
-# Scale Kuadrant components  
+# Scale Kuadrant components
 kubectl scale deployment/limitador -n kuadrant-system --replicas=3
 kubectl scale deployment/authorino -n kuadrant-system --replicas=2
 ```
-
-### Redis Optimization
-
-For high-traffic deployments, consider:
-- Redis clustering
-- Persistent storage
-- Memory optimization
-- Connection pooling
-
-## Security Considerations
-
-- Use proper TLS certificates (not self-signed)
-- Configure network policies
-- Enable mutual TLS in Istio
-- Regular security updates
-- Monitor for suspicious activity
-
-## 🚀 Quick Start 
-
-**If you have infrastructure but no model pods running** (like the current state), follow the detailed guide:
-
-**👉 [Complete Step-by-Step Guide](STEP-BY-STEP.md)**
-
-### TL;DR - Get Your First Model Running
-
-```bash
-cd deployment/kuadrant
-
-# 1. Deploy your first model (Qwen3-0.6B - smallest and fastest)
-kubectl apply -f ../model_serving/qwen3-0.6b-vllm-raw.yaml
-
-# 2. Wait for model to download and start (5-15 minutes)
-kubectl wait --for=condition=Ready inferenceservice qwen3-0-6b-instruct -n llm --timeout=900s
-
-# 3. Deploy routing and policies
-kubectl apply -f 05-model-routing.yaml
-kubectl apply -f 07-api-key-secrets.yaml
-kubectl apply -f 08-auth-policies-apikey.yaml
-kubectl apply -f 06-rate-limit-policies.yaml
-
-# 4. Test your model
-kubectl port-forward -n istio-system svc/istio-ingressgateway 8000:80 &
-curl -H 'Authorization: APIKEY admin-key-12345' \
-     -H 'Content-Type: application/json' \
-     -d '{"messages":[{"role":"user","content":"Write a Python function!"}]}' \
-     http://localhost:8000/qwen/v1/chat/completions
-```
-
-## Localhost Development Workflow
-
-### Starting Everything
-
-```bash
-cd deployment/kuadrant
-
-# Follow the step-by-step guide for initial setup
-# See: STEP-BY-STEP.md
-
-# For daily development:
-./localhost-setup.sh start     # Start port-forwards
-./test-api.sh                  # Test the APIs
-```
-
-### Daily Development
-
-```bash
-./localhost-setup.sh status    # Check what's running
-./localhost-setup.sh restart   # Restart port-forwards if needed
-./localhost-setup.sh stop      # Stop when done
-```
-
-### Troubleshooting Localhost Setup
-
-```bash
-# Check if components are running
-kubectl get pods -n kuadrant-system
-kubectl get pods -n istio-system  
-kubectl get pods -n kserve
-kubectl get pods -n cert-manager
-kubectl get pods -n minio-system
-kubectl get pods -n llm
-
-# Check port-forward status
-./localhost-setup.sh status
-
-# Restart everything
-./localhost-setup.sh restart
-```
-
-### Common Issues and Solutions
-
-1. **KServe CRDs not found**: 
-   ```bash
-   # Install cert-manager first
-   kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.17.0/cert-manager.yaml
-   kubectl wait --for=condition=Available deployment/cert-manager -n cert-manager --timeout=300s
-   
-   # Then install KServe
-   kubectl apply --server-side -f https://github.com/kserve/kserve/releases/download/v0.15.0/kserve.yaml
-   kubectl wait --for=condition=Available deployment/kserve-controller-manager -n kserve --timeout=300s
-   ```
-
-2. **ObjectBucketClaim errors (original model_serving files)**:
-   ```bash
-   # Fix model serving for MinIO
-   ./fix-model-serving.sh
-   ```
-
-3. **KServe webhook certificate errors**:
-   ```bash
-   # Check cert-manager is running
-   kubectl get pods -n cert-manager
-   
-   # Check certificates are issued
-   kubectl get certificates -n kserve
-   
-   # If issues persist, restart KServe controller
-   kubectl rollout restart deployment/kserve-controller-manager -n kserve
-   ```
-
-4. **Model servers not starting**:
-   ```bash
-   kubectl logs -n llm deployment/granite-model-server
-   kubectl get events -n llm
-   ```
-
-5. **MinIO not accessible**:
-   ```bash
-   kubectl port-forward -n minio-system svc/minio 9001:9001
-   # Access MinIO console at http://localhost:9001 (admin/admin)
-   ```
-
-4. **Authentication not working**: 
-   - The mock setup works without authentication by default
-   - To enable auth, deploy Keycloak and configure the auth policies
-
-## Support
-
-- [Kuadrant Documentation](https://docs.kuadrant.io/)
-- [Istio Documentation](https://istio.io/docs/)
-- [Gateway API Documentation](https://gateway-api.sigs.k8s.io/)
-- [KServe Documentation](https://kserve.github.io/website/)

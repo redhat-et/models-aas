@@ -15,11 +15,11 @@ NC='\033[0m'
 DOMAIN=${DOMAIN:-"localhost:8000"}
 KEYCLOAK_URL=${KEYCLOAK_URL:-"http://localhost:8080"}
 
-# API Keys for testing (use these instead of JWT tokens)
-ADMIN_API_KEY="admin-key-12345"
-DEV_API_KEY="dev-key-67890" 
-USER_API_KEY="user-key-abcdef"
-READONLY_API_KEY="readonly-key-999"
+# API Keys for testing (tiered rate limiting)
+PREMIUM_API_KEY_1="premiumuser1_key"
+PREMIUM_API_KEY_2="premiumuser2_key"
+FREE_API_KEY_1="freeuser1_key"
+FREE_API_KEY_2="freeuser2_key"
 
 echo -e "${GREEN}Testing Kuadrant Models-as-a-Service API...${NC}"
 
@@ -50,13 +50,14 @@ setup_auth() {
     echo -e "${YELLOW}Setting up API Key authentication...${NC}"
     
     # Test different API keys
-    test_api_key "Admin API Key" "$ADMIN_API_KEY"
-    test_api_key "Developer API Key" "$DEV_API_KEY"  
-    test_api_key "User API Key" "$USER_API_KEY"
+    test_api_key "Premium User 1" "$PREMIUM_API_KEY_1"
+test_api_key "Premium User 2" "$PREMIUM_API_KEY_2"
+test_api_key "Free User 1" "$FREE_API_KEY_1"
+test_api_key "Free User 2" "$FREE_API_KEY_2"
     
-    # Use admin key for tests
-    TOKEN="$ADMIN_API_KEY"
-    echo -e "${GREEN}✓ Using Admin API Key for tests${NC}"
+    # Use premium key for tests
+    TOKEN="$PREMIUM_API_KEY_1"
+    echo -e "${GREEN}✓ Using Premium API Key for tests${NC}"
 }
 
 # Function to test endpoint

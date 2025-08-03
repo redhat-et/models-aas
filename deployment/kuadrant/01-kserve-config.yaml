@@ -15,7 +15,7 @@ data:
       "enableGatewayApi": true,
       "kserveIngressGateway": "llm/kuadrant-gateway",
       "ingressGateway": "istio-system/istio-ingressgateway",
-      "ingressDomain": "localhost"
+      "ingressDomain": "maas.local"
     }
   storageInitializer: |
     {
