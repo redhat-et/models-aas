@@ -1,6 +1,6 @@
 # Rate limiting policies for the models
 ---
-apiVersion: kuadrant.io/v1beta2
+apiVersion: kuadrant.io/v1
 kind: RateLimitPolicy
 metadata:
   name: qwen3-rate-limit
@@ -26,7 +26,7 @@ spec:
       counters:
         - metadata.filter_metadata.envoy\.common\.jwt.sub
 ---
-apiVersion: kuadrant.io/v1beta2
+apiVersion: kuadrant.io/v1
 kind: RateLimitPolicy
 metadata:
   name: granite-rate-limit
@@ -56,7 +56,7 @@ spec:
       counters:
         - metadata.filter_metadata.envoy\.common\.jwt.sub
 ---
-apiVersion: kuadrant.io/v1beta2
+apiVersion: kuadrant.io/v1
 kind: RateLimitPolicy
 metadata:
   name: mistral-rate-limit
@@ -82,7 +82,7 @@ spec:
       counters:
         - metadata.filter_metadata.envoy\.common\.jwt.sub
 ---
-apiVersion: kuadrant.io/v1beta2
+apiVersion: kuadrant.io/v1
 kind: RateLimitPolicy
 metadata:
   name: qwen-rate-limit
@@ -108,7 +108,7 @@ spec:
       counters:
         - metadata.filter_metadata.envoy\.common\.jwt.sub
 ---
-apiVersion: kuadrant.io/v1beta2
+apiVersion: kuadrant.io/v1
 kind: RateLimitPolicy
 metadata:
   name: nomic-rate-limit

@@ -138,19 +138,34 @@ kubectl apply -f 06-rate-limit-policies.yaml
 kubectl get authpolicy,ratelimitpolicy -n llm
 ```
 
-## Step 6: Test Your Model
+## Step 6: Test Your Model with Authentication
+
+**IMPORTANT**: For authentication to work, you MUST port-forward to the Kuadrant gateway service in the `llm` namespace:
 
 ```bash
-# Start port forwarding to access the gateway
-kubectl port-forward -n istio-system svc/istio-ingressgateway 8000:80 &
+# Port-forward to Kuadrant gateway (REQUIRED for authentication)
+kubectl port-forward -n llm svc/kuadrant-gateway-istio 8000:80 &
 
-# Test the model endpoint
+# Wait for connection to establish
+sleep 2
+
+# Test the PROTECTED model endpoint (authentication required)
 curl -H 'Authorization: APIKEY admin-key-12345' \
      -H 'Content-Type: application/json' \
      -d '{"model":"qwen3-0-6b-instruct","messages":[{"role":"user","content":"Hello! Write a Python function."}]}' \
      http://localhost:8000/qwen3/v1/chat/completions
 
 # Expected: JSON response with AI-generated text
+```
+
+**Verify Authentication is Working:**
+```bash
+# Test WITHOUT API key (should be blocked)
+curl -H 'Content-Type: application/json' \
+     -d '{"model":"qwen3-0-6b-instruct","messages":[{"role":"user","content":"Hello"}]}' \
+     http://localhost:8000/qwen3/v1/chat/completions
+
+# Expected: Request hangs/times out (blocked by Kuadrant AuthPolicy)
 ```
 
 ## Troubleshooting Common Issues

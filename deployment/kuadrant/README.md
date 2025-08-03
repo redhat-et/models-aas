@@ -247,14 +247,26 @@ sleep 5
 curl -H 'Host: localhost' http://localhost:8000/health
 ```
 
-**Port Forwarding Endpoints:**
+**Protected API Endpoints (✅ WORKING):**
+
+**Setup Required**: Port-forward to Istio gateway for authentication:
 ```bash
-# Model endpoints (with API key) - Chat Completions
-# Qwen3-0.6B Model (WORKING)
+kubectl port-forward -n llm svc/kuadrant-gateway-istio 8000:80 &
+```
+
+**Qwen3-0.6B Model** (✅ Authentication Working):
+```bash
+# With API key (REQUIRED)
 curl -H 'Authorization: APIKEY admin-key-12345' \
      -H 'Content-Type: application/json' \
      -d '{"model":"qwen3-0-6b-instruct","messages":[{"role":"user","content":"Hello! Write a Python function."}]}' \
      http://localhost:8000/qwen3/v1/chat/completions
+
+# Without API key (BLOCKED - this will hang/timeout)
+curl -H 'Content-Type: application/json' \
+     -d '{"model":"qwen3-0-6b-instruct","messages":[{"role":"user","content":"Hello"}]}' \
+     http://localhost:8000/qwen3/v1/chat/completions
+```
 
 # Other models (require setup)
 curl -H 'Authorization: APIKEY admin-key-12345' \
@@ -338,9 +350,22 @@ kubectl apply -f 08-observability.yaml
 kubectl apply -f 09-monitoring-dashboard.yaml
 ```
 
-### 11. Set Up Localhost Access
+### 11. Set Up Localhost Access for Protected APIs
 
-Use the localhost setup script to start port-forwarding:
+**IMPORTANT**: To use authentication and API protection, you MUST port-forward to the Istio gateway service, not directly to model services.
+
+```bash
+# Port-forward to Istio gateway (REQUIRED for authentication)
+kubectl port-forward -n llm svc/kuadrant-gateway-istio 8000:80 &
+
+# Wait for port-forward to establish
+sleep 2
+
+# Test connectivity
+curl -H 'Host: localhost' http://localhost:8000/health
+```
+
+**Alternative**: Use the localhost setup script (if available):
 
 ```bash
 chmod +x localhost-setup.sh
@@ -348,8 +373,8 @@ chmod +x localhost-setup.sh
 ```
 
 This will set up port-forwards for:
-- API Gateway: http://localhost:8000
-- Prometheus: http://localhost:9090 (if available)
+- **API Gateway**: http://localhost:8000 (✅ **Authentication enforced**)
+- Prometheus: http://localhost:9090 (if available)  
 - Grafana: http://localhost:3000 (if available)
 - Keycloak: http://localhost:8080 (if available)
 
