@@ -39,9 +39,9 @@ This repository demonstrates how to deploy a Models-as-a-Service platform using 
    ↓
 6. Kube Service exposes the pod
    ↓
-7. HTTPRoute connects gateway to the service
+7. HTTPRoute creates domain-based routing (e.g., qwen3.maas.local, simulator.maas.local)
    ↓
-8. Kuadrant policies protect the route
+8. Kuadrant policies protect each domain route
 ```
 
 ## Prerequisites
