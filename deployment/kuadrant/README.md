@@ -6,7 +6,7 @@ This repository demonstrates how to deploy a Models-as-a-Service platform using 
 
 **Gateway:** API Gateway + Istio/Envoy with Kuadrant policies integrated
 **Models:** KServe InferenceServices (Granite, Mistral, Nomic, Qwen, Simulator)
-**Authentication:** API Keys (simple) or Keycloak (Red Hat SSO)  (TODO: KC not implemented, static keys currently)
+**Authentication:** API Keys (simple) or Keycloak (Red Hat SSO)
 **Rate Limiting:** Kuadrant RateLimitPolicy
 **Observability:** Prometheus + Kuadrant Scrapes (for Kuadrant chargeback WIP see [Question on mapping authorized_calls metrics to a user](https://github.com/Kuadrant/limitador/issues/434))
 
@@ -566,5 +566,132 @@ kubectl wait --for=condition=Available deployment/models-aas-observability -n ll
 
 # Verify deployment
 kubectl get pods -A | grep -E 'kuadrant|llm'
+```
+
+---
+
+## Keycloak OIDC Authentication (Alternative to API Keys)
+
+For production deployments, you can use Keycloak with OIDC JWT tokens instead of static API keys for dev. This provides user management, token expiration, and group-based access control.
+
+This allows for provisioning users into groups dynamically without reconfiguring the MaaS service deployments.
+
+### Deploy Keycloak with OIDC Authentication
+
+```bash
+# Deploy Keycloak and configure OIDC authentication
+kubectl apply -k keycloak/
+
+# Wait for Keycloak to be ready
+kubectl wait --for=condition=Available deployment/keycloak -n keycloak-system --timeout=300s
+
+# Wait for realm import job to complete
+kubectl wait --for=condition=Complete job/keycloak-realm-import -n keycloak-system --timeout=300s
+
+# Port-forward Keycloak for token management
+kubectl port-forward -n keycloak-system svc/keycloak 8080:8080 &
+```
+
+### User Accounts and Tiers
+
+The Keycloak realm has a few pre-configured users across the three tiers/groups for demoing:
+
+| Tier | Users | Rate Limit | Password |
+|------|-------|------------|----------|
+| **Free** | `freeuser1`, `freeuser2` | 5 req/2min | `password123` |
+| **Premium** | `premiumuser1`, `premiumuser2` | 20 req/2min | `password123` |
+| **Enterprise** | `enterpriseuser1` | 100 req/2min | `password123` |
+
+### Get JWT Tokens
+
+Use the provided script to get JWT tokens for testing:
+
+```bash
+# Get token for a free user
+cd keycloak/
+./get-token.sh freeuser1
+
+# Get token for a premium user  
+./get-token.sh premiumuser1
+
+# Get token for an enterprise user
+./get-token.sh enterpriseuser1
+```
+
+### Test OIDC Authentication
+
+```bash
+# Run the rate-limiting tests with OIDC auth and rate limiting tests
+cd keycloak/
+./test-oidc-auth.sh
+```
+
+Example output:
+```bash
+  Testing OIDC Authentication and Rate Limiting
+  API Host: simulator.maas.local:8000
+  Keycloak: localhost:8080
+
+=== Testing Free User: freeuser1 (5 requests per 2min) ===
+✅ Token acquired for freeuser1
+freeuser1 req #1 -> 200 ✅
+freeuser1 req #2 -> 200 ✅
+freeuser1 req #3 -> 200 ✅
+freeuser1 req #4 -> 200 ✅
+freeuser1 req #5 -> 200 ✅
+freeuser1 req #6 -> 429 ⚠️ (rate limited)
+freeuser1 req #7 -> 429 ⚠️ (rate limited)
+```
+
+### Manual API Testing with JWT
+
+```bash
+# Get a token
+TOKEN=$(./get-token.sh freeuser1 | grep -A1 "Access Token:" | tail -1)
+
+# Test API call with JWT
+curl -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"model":"simulator-model","messages":[{"role":"user","content":"Infer call with OIDC Auth!"}]}' \
+     http://simulator.maas.local:8000/v1/chat/completions
+```
+
+### Keycloak Admin Access
+
+Access the Keycloak admin console for user management:
+
+```bash
+# Port-forward Keycloak (if not already done)
+kubectl port-forward -n keycloak-system svc/keycloak 8080:8080
+
+# Access admin console at http://localhost:8080
+# Username: admin
+# Password: admin123
+# Realm: maas
+```
+
+### Architecture Changes with OIDC
+
+When using OIDC authentication:
+
+1. **AuthPolicy** validates JWT tokens from Keycloak
+2. **User identification** based on JWT `sub` claim  
+3. **Rate limiting** per user ID (not API key)
+4. **User attributes** extracted from JWT claims (tier, groups, email)
+
+### Switch Between Authentication Methods in the Demo ENV
+
+```bash
+# Use API keys (default)
+kubectl apply -f 06-auth-policies-apikey.yaml
+kubectl apply -f 07-rate-limit-policies.yaml
+
+# Switch to OIDC
+kubectl apply -f keycloak/05-auth-policy-oidc.yaml  
+kubectl apply -f keycloak/06-rate-limit-policy-oidc.yaml
+
+# Remove the API key policies
+kubectl delete -f 06-auth-policies-apikey.yaml
+kubectl delete -f 07-rate-limit-policies.yaml
 ```
 
