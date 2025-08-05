@@ -1,0 +1,62 @@
+---
+# Qwen3-0.6B Model serving for CPU (no GPU required)
+# Simplified configuration for minikube/local development
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  annotations:
+    openshift.io/display-name: DialoGPT-Small-CPU
+    serving.kserve.io/deploymentMode: RawDeployment
+  name: dialogpt-small-cpu
+  namespace: llm
+  labels:
+    opendatahub.io/dashboard: 'true'
+spec:
+  predictor:
+    maxReplicas: 1
+    minReplicas: 1
+    containers:
+    - name: kserve-container
+      image: ghcr.io/huggingface/text-generation-inference:2.0.1
+      ports:
+      - containerPort: 3000
+        protocol: TCP
+      env:
+      - name: MODEL_ID
+        value: "microsoft/DialoGPT-small"
+      - name: PORT
+        value: "3000"
+      - name: HUGGINGFACE_HUB_CACHE
+        value: "/data"
+      - name: HF_TOKEN
+        value: ""
+      readinessProbe:
+        httpGet:
+          path: /health
+          port: 3000
+        initialDelaySeconds: 30
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 30
+      livenessProbe:
+        httpGet:
+          path: /health
+          port: 3000
+        initialDelaySeconds: 60
+        periodSeconds: 30
+        timeoutSeconds: 10
+        failureThreshold: 5
+      resources:
+        limits:
+          cpu: '4'
+          memory: 8Gi
+        requests:
+          cpu: '1'
+          memory: 4Gi
+      volumeMounts:
+      - mountPath: /data
+        name: model-cache
+    volumes:
+    - name: model-cache
+      emptyDir:
+        sizeLimit: 10Gi
