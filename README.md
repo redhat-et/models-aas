@@ -1,50 +1,6 @@
 # Models as a Service
 
-This repository demonstrates how to deploy AI models as APIs with enterprise-grade gateway capabilities. It is building on the excellent models-aas work.
-
-## 🔄 **Kuadrant Fork** - Cloud-Native API Management
-
-**This is a fork** of the [original 3scale implementation](https://github.com/rh-aiservices-bu/models-aas) that **replaces 3scale with Kuadrant** a cloud-native API management in conjunction with kserve.
-
-### 🚀 **New: Kuadrant Implementation** → [**`deployment/kuadrant/`**](deployment/kuadrant/)
-
-The Kuadrant implementation provides:
-
-- **Cloud-Native Architecture**: Built on Istio + Gateway API + KServe
-- **Tiered API Authentication**: Free/Premium API keys with rate limiting
-- **High-Performance Gateway**: Envoy-based with automatic scaling
-- **GitOps-Ready**: All configuration as Kubernetes YAML
-- **Out of the Box Features**: authentication, rate limiting, and monitoring
-
-**Quick Start:**
-
-```bash
-git clone https://github.com/redhat-et/models-aas.git
-cd deployment/kuadrant
-./install.sh --simulator    # For testing without GPU
-./install.sh --qwen3        # For GPU clusters with real AI models
-./install.sh --qwen3        # For deploying both the GPU and Sim
-./install.sh --deploy-kind  # Deploy a Kind cluster with a model simulator
-```
-
-### Why Choose Kuadrant over 3scale for MaaS?
-
-| Aspect | 3scale | Kuadrant |
-|--------|--------|----------|
-| **Architecture** | Monolithic APIcast | Cloud-native microservices |
-| **Configuration** | Web UI + API calls | GitOps YAML manifests |
-| **Gateway** | Custom APIcast | Industry-standard Istio/Envoy |
-| **API Standards** | Proprietary | Open Gateway API |
-| **Kubernetes Integration** | External system | Native CRDs |
-| **Rate Limiting** | Built-in policies | Dedicated Limitador service |
-| **Authentication** | Integrated auth | Pluggable Authorino |
-| **Scaling** | Manual scaling | Kubernetes HPA/VPA |
-
----
-
-## Original 3scale Implementation
-
-This repository also features the original example of how you can set up 3scale and Red Hat SSO in front of models served by OpenShift AI to offer your users a portal through which they can register and get access keys to the models' endpoints.
+This repository features an example of how you can set up 3scale and Red Hat SSO in front of models served by OpenShift AI to offer your users a portal through which they can register and get access keys to the models' endpoints.
 
 Although not a reference architecture (there are many ways to implement this type of solution), this can serve as starting point to create such a service in your environment.
 
