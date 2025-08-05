@@ -8,10 +8,10 @@ metadata:
   name: qwen3-domain-route
   namespace: llm
   labels:
-    kuadrant.io/gateway: kuadrant-gateway
+    kuadrant.io/gateway: inference-gateway
 spec:
   parentRefs:
-    - name: kuadrant-gateway
+    - name: inference-gateway
       namespace: llm
   hostnames:
     - "qwen3.maas.local"
@@ -32,10 +32,10 @@ metadata:
   name: simulator-domain-route
   namespace: llm
   labels:
-    kuadrant.io/gateway: kuadrant-gateway
+    kuadrant.io/gateway: inference-gateway
 spec:
   parentRefs:
-    - name: kuadrant-gateway
+    - name: inference-gateway
       namespace: llm
   hostnames:
     - "simulator.maas.local"
@@ -56,10 +56,10 @@ metadata:
   name: granite-domain-route
   namespace: llm
   labels:
-    kuadrant.io/gateway: kuadrant-gateway
+    kuadrant.io/gateway: inference-gateway
 spec:
   parentRefs:
-    - name: kuadrant-gateway
+    - name: inference-gateway
       namespace: llm
   hostnames:
     - "granite.maas.local"
@@ -80,10 +80,10 @@ metadata:
   name: mistral-domain-route
   namespace: llm
   labels:
-    kuadrant.io/gateway: kuadrant-gateway
+    kuadrant.io/gateway: inference-gateway
 spec:
   parentRefs:
-    - name: kuadrant-gateway
+    - name: inference-gateway
       namespace: llm
   hostnames:
     - "mistral.maas.local"
@@ -104,10 +104,10 @@ metadata:
   name: nomic-domain-route
   namespace: llm
   labels:
-    kuadrant.io/gateway: kuadrant-gateway
+    kuadrant.io/gateway: inference-gateway
 spec:
   parentRefs:
-    - name: kuadrant-gateway
+    - name: inference-gateway
       namespace: llm
   hostnames:
     - "nomic.maas.local"

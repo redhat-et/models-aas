@@ -5,7 +5,7 @@
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: kuadrant-gateway
+  name: inference-gateway
   namespace: llm
 spec:
   gatewayClassName: istio
@@ -30,10 +30,10 @@ metadata:
   name: granite-hostname-route
   namespace: llm
   labels:
-    kuadrant.io/gateway: kuadrant-gateway
+    kuadrant.io/gateway: inference-gateway
 spec:
   parentRefs:
-    - name: kuadrant-gateway
+    - name: inference-gateway
       namespace: llm
   hostnames:
     - "granite-3-3-8b-instruct-maas-apicast-production.apps.prod.rhoai.rh-aiservices-bu.com"
@@ -54,10 +54,10 @@ metadata:
   name: simulator-hostname-route
   namespace: llm
   labels:
-    kuadrant.io/gateway: kuadrant-gateway
+    kuadrant.io/gateway: inference-gateway
 spec:
   parentRefs:
-    - name: kuadrant-gateway
+    - name: inference-gateway
       namespace: llm
   hostnames:
     - "simulator-instruct-maas-apicast-production.apps.prod.rhoai.rh-aiservices-bu.com"
@@ -78,10 +78,10 @@ metadata:
   name: qwen3-hostname-route
   namespace: llm
   labels:
-    kuadrant.io/gateway: kuadrant-gateway
+    kuadrant.io/gateway: inference-gateway
 spec:
   parentRefs:
-    - name: kuadrant-gateway
+    - name: inference-gateway
       namespace: llm
   hostnames:
     - "qwen3-0-6b-instruct-maas-apicast-production.apps.prod.rhoai.rh-aiservices-bu.com"

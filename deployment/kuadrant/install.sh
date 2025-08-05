@@ -17,20 +17,22 @@ set -euo pipefail
 NAMESPACE="llm"
 MODEL_TYPE=""
 DEPLOY_KIND=false
+SKIP_METRICS=false
 
 usage() {
   cat <<EOF
-Usage: $0 [--simulator|--qwen3|--install-all-models|--deploy-kind]
+Usage: $0 [--simulator|--qwen3|--install-all-models|--deploy-kind] [--skip-metrics]
 
 Options
   --simulator            Deploy vLLM simulator (no GPU required)
   --qwen3                Deploy Qwen3-0.6B model (GPU required)
   --install-all-models   Deploy both simulator and Qwen3
   --deploy-kind           Create a kind cluster named llm-maas and deploy the simulator model
+  --skip-metrics         Skip Prometheus observability deployment
 
 Examples
   $0 --simulator
-  $0 --qwen3
+  $0 --qwen3 --skip-metrics
   $0 --install-all-models
   $0 --deploy-kind
 EOF
@@ -44,6 +46,7 @@ while [[ $# -gt 0 ]]; do
     --qwen3)               MODEL_TYPE="qwen3"     ; shift ;;
     --install-all-models)  MODEL_TYPE="all"       ; shift ;;
     --deploy-kind)         DEPLOY_KIND=true; MODEL_TYPE="simulator" ; shift ;;
+    --skip-metrics)        SKIP_METRICS=true ; shift ;;
     -h|--help)             usage ;;
     *) echo "❌ Unknown option: $1"; usage ;;
   esac
@@ -158,8 +161,24 @@ kubectl apply -f 07-rate-limit-policies.yaml
 kubectl rollout restart deployment kuadrant-operator-controller-manager -n kuadrant-system
 kubectl wait --for=condition=Available deployment/kuadrant-operator-controller-manager -n kuadrant-system --timeout=300s
 
-# ────────────────────────────── 8. Verification ──────────────────────────────
-echo "🔧 8. Verifying objects"
+# ────────────────────────────── 8. Observability ─────────────────────────────
+if [[ "$SKIP_METRICS" == false ]]; then
+  echo "🔧 8. Installing Prometheus observability"
+  
+  # Install Prometheus Operator
+  kubectl apply --server-side --field-manager=quickstart-installer -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/master/bundle.yaml
+  
+  # Wait for Prometheus Operator to be ready
+  kubectl wait --for=condition=Available deployment/prometheus-operator -n default --timeout=300s
+  
+  # From models-aas/deployment/kuadrant Kuadrant prometheus observability
+  kubectl apply -k kustomize/prometheus/
+else
+  echo "⏭️  8. Skipping Prometheus observability (--skip-metrics flag)"
+fi
+
+# ────────────────────────────── 9. Verification ──────────────────────────────
+echo "🔧 9. Verifying objects"
 kubectl get gateway,httproute,authpolicy,ratelimitpolicy -n "$NAMESPACE"
 kubectl get inferenceservice,pods -n "$NAMESPACE"
 
@@ -167,8 +186,16 @@ echo
 echo "✅ MaaS installation complete!"
 echo
 echo "🔌 Port-forward the gateway in a separate terminal:"
-echo "   kubectl port-forward -n $NAMESPACE svc/kuadrant-gateway-istio 8000:80"
+echo "   kubectl port-forward -n $NAMESPACE svc/inference-gateway-istio 8000:80"
 echo
+
+if [[ "$SKIP_METRICS" == false ]]; then
+echo "📊 Access Prometheus metrics (in separate terminals):"
+echo "   kubectl port-forward -n llm-observability svc/models-aas-observability 9090:9090"
+echo "   kubectl port-forward -n kuadrant-system svc/limitador-limitador 8080:8080"
+echo "   Then visit: http://localhost:9090 (Prometheus) and http://localhost:8080/metrics (Limitador)"
+echo
+fi
 echo "🎯 Test examples (domain routing):"
 
 if [[ "$MODEL_TYPE" == "simulator" || "$MODEL_TYPE" == "all" ]]; then
@@ -204,6 +231,7 @@ echo
 echo "📊  Available API keys"
 echo "    Free:      freeuser1_key, freeuser2_key (5 req/2 min)"
 echo "    Premium:   premiumuser1_key, premiumuser2_key (20 req/2 min)"
-echo "    🤖 Run an automated quota stress with scripts/test-request-limits.sh"
+echo "    Forward the inference gateway with → kubectl port-forward -n llm svc/inference-gateway-istio 8000:80"
+echo "    🤖 Run an automated quota stress with → scripts/test-request-limits.sh"
 echo
 echo "🔥 Deploy complete"

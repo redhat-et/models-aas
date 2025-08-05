@@ -13,7 +13,7 @@ data:
   ingress: |
     {
       "enableGatewayApi": true,
-      "kserveIngressGateway": "llm/kuadrant-gateway",
+      "kserveIngressGateway": "llm/inference-gateway",
       "ingressGateway": "istio-system/istio-ingressgateway",
       "ingressDomain": "maas.local"
     }

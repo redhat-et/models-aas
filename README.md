@@ -16,29 +16,31 @@ The Kuadrant implementation provides:
 - **GitOps-Ready**: All configuration as Kubernetes YAML
 - **Out of the Box Features**: authentication, rate limiting, and monitoring
 
-**Quick Start:**
+**Quick Start Scripted:**
 
 ```bash
 git clone https://github.com/redhat-et/models-aas.git
 cd deployment/kuadrant
-./install.sh --simulator    # For testing without GPU
-./install.sh --qwen3        # For GPU clusters with real AI models
-./install.sh --qwen3        # For deploying both the GPU and Sim
-./install.sh --deploy-kind  # Deploy a Kind cluster with a model simulator
+./install.sh --simulator            # For testing without GPU
+./install.sh --qwen3                # For GPU clusters with real AI models
+./install.sh --install-all-models   # For deploying both the qwen model (on a GPU) and inference sim
+./install.sh --deploy-kind          # Deploy a Kind cluster with a model simulator
 ```
+
+**View the step by step manual deployment here** → [**`deployment/kuadrant/`**](deployment/kuadrant/)
 
 ### Why Choose Kuadrant over 3scale for MaaS?
 
-| Aspect | 3scale | Kuadrant |
-|--------|--------|----------|
-| **Architecture** | Monolithic APIcast | Cloud-native microservices |
-| **Configuration** | Web UI + API calls | GitOps YAML manifests |
-| **Gateway** | Custom APIcast | Industry-standard Istio/Envoy |
-| **API Standards** | Proprietary | Open Gateway API |
-| **Kubernetes Integration** | External system | Native CRDs |
-| **Rate Limiting** | Built-in policies | Dedicated Limitador service |
-| **Authentication** | Integrated auth | Pluggable Authorino |
-| **Scaling** | Manual scaling | Kubernetes HPA/VPA |
+| Aspect                     | 3scale             | Kuadrant                      |
+|----------------------------|--------------------|-------------------------------|
+| **Architecture**           | Monolithic APIcast | Cloud-native microservices    |
+| **Configuration**          | Web UI + API calls | GitOps YAML manifests         |
+| **Gateway**                | Custom APIcast     | Industry-standard Istio/Envoy |
+| **API Standards**          | Proprietary        | Open Gateway API              |
+| **Kubernetes Integration** | External system    | Native CRDs                   |
+| **Rate Limiting**          | Built-in policies  | Dedicated Limitador service   |
+| **Authentication**         | Integrated auth    | Pluggable Authorino           |
+| **Scaling**                | Manual scaling     | Kubernetes HPA/VPA            |
 
 ---
 
@@ -279,3 +281,4 @@ There is also a download option in case you want to do changes manually on the 3
 In [this folder](https://github.com/rh-aiservices-bu/rhoaibu-cluster/tree/dev/components/configs/maas/3scale-config/base) of our cluster configuration repository, you will find the different configuration files (subfolders organized by models) you can use with the 3Scale operator to automatically create and configure Backends and Products.
 
 Adjustments may have to be done after this automated configuration as not all parameters are handled by the operator, like the Default plan that is applied to a Product.
+

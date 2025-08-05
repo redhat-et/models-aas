@@ -6,10 +6,10 @@ metadata:
   name: qwen3-route
   namespace: llm
   labels:
-    kuadrant.io/gateway: kuadrant-gateway
+    kuadrant.io/gateway: inference-gateway
 spec:
   parentRefs:
-    - name: kuadrant-gateway
+    - name: inference-gateway
       namespace: llm
   hostnames:
     - "localhost"
@@ -37,10 +37,10 @@ metadata:
   name: granite-route
   namespace: llm
   labels:
-    kuadrant.io/gateway: kuadrant-gateway
+    kuadrant.io/gateway: inference-gateway
 spec:
   parentRefs:
-    - name: kuadrant-gateway
+    - name: inference-gateway
       namespace: llm
   hostnames:
     - "localhost"
@@ -67,10 +67,10 @@ metadata:
   name: mistral-route
   namespace: llm
   labels:
-    kuadrant.io/gateway: kuadrant-gateway
+    kuadrant.io/gateway: inference-gateway
 spec:
   parentRefs:
-    - name: kuadrant-gateway
+    - name: inference-gateway
       namespace: llm
   hostnames:
     - "localhost"
@@ -97,10 +97,10 @@ metadata:
   name: qwen-route
   namespace: llm
   labels:
-    kuadrant.io/gateway: kuadrant-gateway
+    kuadrant.io/gateway: inference-gateway
 spec:
   parentRefs:
-    - name: kuadrant-gateway
+    - name: inference-gateway
       namespace: llm
   hostnames:
     - "localhost"
@@ -127,10 +127,10 @@ metadata:
   name: simulator-route
   namespace: llm
   labels:
-    kuadrant.io/gateway: kuadrant-gateway
+    kuadrant.io/gateway: inference-gateway
 spec:
   parentRefs:
-    - name: kuadrant-gateway
+    - name: inference-gateway
       namespace: llm
   hostnames:
     - "localhost"
@@ -157,10 +157,10 @@ metadata:
   name: nomic-route
   namespace: llm
   labels:
-    kuadrant.io/gateway: kuadrant-gateway
+    kuadrant.io/gateway: inference-gateway
 spec:
   parentRefs:
-    - name: kuadrant-gateway
+    - name: inference-gateway
       namespace: llm
   hostnames:
     - "localhost"

@@ -4,11 +4,11 @@ This repository demonstrates how to deploy a Models-as-a-Service platform using 
 
 ## Architecture Overview
 
-**Gateway:** Istio + Envoy with Kuadrant policies
+**Gateway:** API Gateway + Istio/Envoy with Kuadrant policies integrated
 **Models:** KServe InferenceServices (Granite, Mistral, Nomic, Qwen, Simulator)
-**Authentication:** API Keys (simple) or Keycloak (Red Hat SSO)  (TODO: not implemented, static keys currently)
-**Rate Limiting:** Kuadrant RateLimitPolicy with Redis backend (Limitador redis yaml included but not tested and probably not working)
-**Observability:** Prometheus + Grafana with custom LLM metrics (TODO: setup chargeback prom)
+**Authentication:** API Keys (simple) or Keycloak (Red Hat SSO)  (TODO: KC not implemented, static keys currently)
+**Rate Limiting:** Kuadrant RateLimitPolicy
+**Observability:** Prometheus + Kuadrant Scrapes (for Kuadrant chargeback WIP see [Question on mapping authorized_calls metrics to a user](https://github.com/Kuadrant/limitador/issues/434))
 
 ### Key Components
 
@@ -24,7 +24,7 @@ This repository demonstrates how to deploy a Models-as-a-Service platform using 
 **The flow that creates actual running model pods:**
 
 ```
-1. You apply an InferenceService YAML
+1. Apply an InferenceService YAML
    ↓
 2. KServe Controller sees the InferenceService
    ↓
@@ -44,27 +44,39 @@ This repository demonstrates how to deploy a Models-as-a-Service platform using 
 8. Kuadrant policies protect the route
 ```
 
-**Key Point**: Without applying InferenceService YAMLs, you get no model pods. The InferenceService is what triggers KServe to create the actual AI model containers.
-
 ## Prerequisites
 
 - Kubernetes cluster with admin access
 - kubectl configured
 - For KIND clusters: `kind create cluster --name llm-maas`
 - For minikube with GPU: `minikube start --driver docker --container-runtime docker --gpus all --memory no-limit --cpus no-limit`
+- Kustomize
 
 ## 🚀 Quick Start (Automated Installer)
 
 **For KIND clusters (no GPU):**
+
 ```bash
 cd ~/rhmaas/models-aas/deployment/kuadrant
 ./install.sh --simulator
 ```
 
 **For GPU clusters:**
+
 ```bash
 cd ~/rhmaas/models-aas/deployment/kuadrant  
 ./install.sh --qwen3
+```
+
+**More Examples**
+
+```bash
+git clone https://github.com/redhat-et/models-aas.git
+cd deployment/kuadrant
+./install.sh --simulator            # For testing without GPU
+./install.sh --qwen3                # For GPU clusters with real AI models
+./install.sh --install-all-models   # For deploying both the qwen (on a GPU) and Sim
+./install.sh --deploy-kind          # Deploy a Kind cluster with a model simulator
 ```
 
 The installer will:
@@ -143,7 +155,7 @@ kubectl get configmap inferenceservice-config -n kserve \
 
 # Output
 # {"defaultDeploymentMode": "RawDeployment"}
-# {"enableGatewayApi": true, "kserveIngressGateway": "kuadrant-gateway.llm"}
+# {"enableGatewayApi": true, "kserveIngressGateway": "inference-gateway.llm"}
 
 ```
 
@@ -186,7 +198,7 @@ kubectl rollout restart deployment kuadrant-operator-controller-manager -n kuadr
 #kubectl wait --for=condition=Available deployment/authorino -n kuadrant-system --timeout=300s
 ```
 
-### 5. Deploy Local Storage (for minikube/local development)
+### 5. (Optional) Deploy Local Storage (for minikube/local development)
 
 ```bash
 # Deploy MinIO for S3-compatible local storage
@@ -254,7 +266,7 @@ If running on kind/minikube, you need port forwarding to access the models:
 
 ```bash
 # Port-forward to Kuadrant gateway (REQUIRED for authentication)
-kubectl port-forward -n llm svc/kuadrant-gateway-istio 8000:80 &
+kubectl port-forward -n llm svc/inference-gateway-istio 8000:80 &
 ```
 
 ### 8. Test the MaaS API
@@ -364,9 +376,91 @@ done
 
 ### 9. Deploy Observability
 
+Deploy Prometheus and monitoring components:
+
 ```bash
-kubectl apply -f 08-observability.yaml
-kubectl apply -f 09-monitoring-dashboard.yaml
+# Install Prometheus Operator
+kubectl apply --server-side --field-manager=quickstart-installer -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/master/bundle.yaml
+
+# Wait for Prometheus Operator to be ready
+kubectl wait --for=condition=Available deployment/prometheus-operator -n default --timeout=300s
+
+# From models-aas/deployment/kuadrant Kuadrant prometheus observability
+kubectl apply -k kustomize/prometheus/
+
+# Wait for Prometheus to be ready
+kubectl wait --for=condition=Running prometheus/models-aas-observability -n llm-observability --timeout=300s
+
+# Port-forward to access Prometheus UI
+kubectl port-forward -n llm-observability svc/models-aas-observability 9090:9090 &
+
+# Forward Limitador admin metric scrape target
+kubectl -n kuadrant-system port-forward svc/limitador-limitador 8080:8080
+
+# Access Prometheus at http://localhost:9090
+```
+
+### Query the Limitador Scrape Endpoint
+
+> 🚨 See this issue for status on getting per user scrape data for authorization and limits with Kudrant [Question on mapping authorized_calls metrics to a user](https://github.com/Kuadrant/limitador/issues/434)
+
+For now, you can scrape namespace wide limits:
+
+```shell
+$ curl -s http://localhost:8080/metrics | grep calls
+# HELP authorized_calls Authorized calls
+# TYPE authorized_calls counter
+authorized_calls{limitador_namespace="llm/simulator-domain-route"} 100
+# HELP limited_calls Limited calls
+# TYPE limited_calls counter
+limited_calls{limitador_namespace="llm/simulator-domain-route"} 16
+```
+
+### Query Metrics via Prom API
+
+```bash
+# Get limited_calls via Prometheus
+curl -sG --data-urlencode 'query=limited_calls'     http://localhost:9090/api/v1/query | jq '.data.result'
+[
+  {
+    "metric": {
+      "__name__": "limited_calls",
+      "container": "limitador",
+      "endpoint": "http",
+      "instance": "10.244.0.19:8080",
+      "job": "limitador-limitador",
+      "limitador_namespace": "llm/simulator-domain-route",
+      "namespace": "kuadrant-system",
+      "pod": "limitador-limitador-84bdfb4747-n8h44",
+      "service": "limitador-limitador"
+    },
+    "value": [
+      1754366303.129,
+      "16"
+    ]
+  }
+]
+
+curl -sG --data-urlencode 'query=authorized_calls'     http://localhost:9090/api/v1/query | jq '.data.result'
+[
+  {
+    "metric": {
+      "__name__": "authorized_calls",
+      "container": "limitador",
+      "endpoint": "http",
+      "instance": "10.244.0.19:8080",
+      "job": "limitador-limitador",
+      "limitador_namespace": "llm/simulator-domain-route",
+      "namespace": "kuadrant-system",
+      "pod": "limitador-limitador-84bdfb4747-n8h44",
+      "service": "limitador-limitador"
+    },
+    "value": [
+      1754366383.534,
+      "100"
+    ]
+  }
+]
 ```
 
 ## Troubleshooting
@@ -419,3 +513,58 @@ kubectl scale deployment/istio-ingressgateway -n istio-system --replicas=3
 kubectl scale deployment/limitador -n kuadrant-system --replicas=3
 kubectl scale deployment/authorino -n kuadrant-system --replicas=2
 ```
+
+---
+
+## Kustomize-Based Deployment (Not Fully Tested)
+
+For production deployments and GitOps workflows, use the modular kustomize structure for better organization and maintainability.
+
+### Kustomize Directory Structure
+
+```
+deployment/kuadrant/kustomize/
+├── base/                    # Core infrastructure (operators, namespaces, storage)
+├── gateway/                 # Gateway API and routing configuration
+├── auth/                    # Authentication and rate limiting policies  
+├── observability/           # Monitoring stack (Prometheus, Grafana)
+└── prometheus/              # Enhanced Prometheus with ServiceMonitors
+```
+
+### Deploy Individual Components
+
+```bash
+cd models-aas/deployment/kuadrant
+
+# Deploy only base infrastructure
+kubectl apply -k kustomize/base/
+
+# Deploy only gateway configuration
+kubectl apply -k kustomize/gateway/
+
+# Deploy only authentication and rate limiting
+kubectl apply -k kustomize/auth/
+
+# Deploy only observability stack
+kubectl apply -k kustomize/observability/
+
+# Deploy enhanced Prometheus separately
+kubectl apply -k kustomize/prometheus/
+```
+
+### Deploy Everything with Kustomize
+
+```bash
+# Deploy complete MaaS platform using modular kustomize
+kubectl apply -k .
+
+# Wait for all components to be ready
+kubectl wait --for=condition=Available deployment/kuadrant-operator-controller-manager -n kuadrant-system --timeout=300s
+kubectl wait --for=condition=Available deployment/limitador-limitador -n kuadrant-system --timeout=300s
+kubectl wait --for=condition=Available deployment/authorino -n kuadrant-system --timeout=300s
+kubectl wait --for=condition=Available deployment/models-aas-observability -n llm-observability --timeout=300s
+
+# Verify deployment
+kubectl get pods -A | grep -E 'kuadrant|llm'
+```
+
