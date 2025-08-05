@@ -107,7 +107,7 @@ show_status() {
     fi
     
     # Check if gateway exists
-    if kubectl get gateway kuadrant-gateway -n llm > /dev/null 2>&1; then
+    if kubectl get gateway inference-gateway -n llm > /dev/null 2>&1; then
         echo -e "${GREEN}✓ Kuadrant gateway is configured${NC}"
     else
         echo -e "${YELLOW}⚠ Kuadrant gateway not found in llm namespace${NC}"
